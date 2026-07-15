@@ -1,0 +1,158 @@
+.index-page {
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+.location-bar {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-sm) 0;
+  margin-bottom: var(--spacing-md);
+}
+
+.location-icon {
+  font-size: var(--font-size-md);
+  margin-right: var(--spacing-xs);
+}
+
+.location-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* 风险等级卡片 */
+.risk-card {
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+  box-shadow: var(--shadow-card);
+}
+
+.risk-card-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-hint);
+  margin-bottom: var(--spacing-md);
+  display: block;
+}
+
+.risk-card-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+}
+
+/* 建议行动 */
+.action-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-md);
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.action-number {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: var(--spacing-md);
+  flex-shrink: 0;
+}
+
+.action-text {
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  flex: 1;
+}
+
+/* 证据列表 */
+.evidence-item {
+  margin-bottom: var(--spacing-sm);
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.evidence-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+}
+
+.evidence-icon {
+  font-size: var(--font-size-lg);
+  margin-right: var(--spacing-sm);
+}
+
+.evidence-title {
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  font-weight: 500;
+  flex: 1;
+}
+
+.evidence-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin-bottom: var(--spacing-sm);
+  display: block;
+}
+
+.evidence-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.evidence-source {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-hint);
+}
+
+.evidence-time {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-hint);
+}
+
+/* 快捷操作 */
+.quick-actions {
+  display: flex;
+  justify-content: space-around;
+  margin: var(--spacing-lg) 0;
+  padding: var(--spacing-lg) 0;
+}
+
+.quick-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-card);
+  box-shadow: var(--shadow-card);
+  min-width: 160px;
+}
+
+.quick-action-icon {
+  font-size: 48px;
+  margin-bottom: var(--spacing-sm);
+}
+
+.quick-action-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  font-weight: 500;
+}

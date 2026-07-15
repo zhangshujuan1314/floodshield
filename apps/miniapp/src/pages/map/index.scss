@@ -1,0 +1,198 @@
+.map-page {
+  min-height: 100vh;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* 地图区域 */
+.map-container {
+  width: 100%;
+  height: 500px;
+  background: #e8e8e8;
+  position: relative;
+}
+
+.map-view {
+  width: 100%;
+  height: 100%;
+}
+
+.map-placeholder,
+.map-unavailable {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f0f0f0;
+}
+
+.map-placeholder-icon,
+.map-unavailable-icon {
+  font-size: 80px;
+  margin-bottom: var(--spacing-md);
+}
+
+.map-placeholder-text,
+.map-unavailable-text {
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  font-weight: 500;
+  margin-bottom: var(--spacing-xs);
+}
+
+.map-placeholder-hint,
+.map-unavailable-hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-hint);
+}
+
+/* 图层切换 */
+.layer-toggles {
+  background: var(--color-bg-card);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.layer-toggles-title {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-hint);
+  margin-bottom: var(--spacing-sm);
+  display: block;
+}
+
+.layer-toggle-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.layer-toggle-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.layer-toggle-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+/* 图例 */
+.legend {
+  background: var(--color-bg-card);
+  padding: var(--spacing-md) var(--spacing-lg);
+  margin: var(--spacing-sm) 0;
+}
+
+.legend-title {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-hint);
+  margin-bottom: var(--spacing-md);
+  display: block;
+}
+
+.legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+}
+
+.legend-group {
+  flex: 1;
+  min-width: 200px;
+}
+
+.legend-group-title {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
+  display: block;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+}
+
+.legend-color {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  margin-right: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.legend-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+/* 列表视图 fallback */
+.list-fallback {
+  flex: 1;
+  padding: var(--spacing-md);
+}
+
+.list-fallback-title {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-md);
+  display: block;
+}
+
+.list-item {
+  margin-bottom: var(--spacing-sm);
+}
+
+.list-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+}
+
+.list-item-badge {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+  display: block;
+}
+
+.list-item-title {
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  font-weight: 500;
+  display: block;
+}
+
+.list-item-sub {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-xs);
+  display: block;
+}
+
+.list-item-detail {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-hint);
+  margin-top: var(--spacing-xs);
+  display: block;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.status-badge-text {
+  font-size: var(--font-size-xs);
+  color: #ffffff;
+  font-weight: 600;
+}

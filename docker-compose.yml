@@ -1,0 +1,107 @@
+# FloodShield - Docker Compose Configuration
+# Usage: docker compose up -d
+
+services:
+  # ─────────────────────────────────────────────
+  # PostgreSQL with PostGIS extension
+  # ─────────────────────────────────────────────
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: floodshield-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-floodshield}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-floodshield}
+      POSTGRES_DB: ${POSTGRES_DB:-floodshield}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - floodshield
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-floodshield} -d ${POSTGRES_DB:-floodshield}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ─────────────────────────────────────────────
+  # FastAPI Backend Service
+  # ─────────────────────────────────────────────
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: floodshield-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-floodshield}:${POSTGRES_PASSWORD:-floodshield}@postgres:5432/${POSTGRES_DB:-floodshield}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - floodshield
+    volumes:
+      - ./services/api:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ─────────────────────────────────────────────
+  # Next.js Admin Dashboard
+  # ─────────────────────────────────────────────
+  admin:
+    build:
+      context: ./apps/admin
+      dockerfile: Dockerfile
+    container_name: floodshield-admin
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:8000
+      NEXT_PUBLIC_MOCK_MODE: "false"
+    depends_on:
+      - api
+    networks:
+      - floodshield
+
+  # ─────────────────────────────────────────────
+  # Redis (placeholder for future use)
+  # ─────────────────────────────────────────────
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: floodshield-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - floodshield
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+# ─────────────────────────────────────────────
+# Networks
+# ─────────────────────────────────────────────
+networks:
+  floodshield:
+    driver: bridge
+
+# ─────────────────────────────────────────────
+# Volumes
+# ─────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+  # redis_data:
+  #   driver: local

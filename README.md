@@ -1,1 +1,300 @@
-# FloodShield initialized
+# 汛安 FloodShield
+
+AI 洪涝预警与避险平台
+
+汛安把官方气象与应急信息、局地雨情、积水上报、道路状态和避险场所数据，转化为居民能立即执行的社区级风险提示、证据化路线建议和基层处置闭环。
+
+## 架构概览
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        居民端 (Taro)                         │
+│  首页风险 · 地图图层 · 避险路线 · 上报 · 语音播报 · 我的      │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ HTTPS / WSS
+┌──────────────────────────▼──────────────────────────────────┐
+│                    FastAPI 后端服务                           │
+│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐    │
+│  │ auth │ │ geo  │ │alerts│ │ risk │ │routes│ │shelter│   │
+│  └──────┘ └──────┘ └──────┘ └──────┘ └──────┘ └──────┘    │
+│  ┌──────────┐ ┌──────────┐ ┌──────┐ ┌──────┐ ┌──────┐     │
+│  │observat. │ │notificat.│ │  ai  │ │audit │ │  ai  │     │
+│  └──────────┘ └──────────┘ └──────┘ └──────┘ └──────┘     │
+└────┬────────────┬────────────┬────────────┬─────────────────┘
+     │            │            │            │
+┌────▼────┐ ┌────▼────┐ ┌────▼────┐ ┌────▼────┐
+│PostgreSQL│ │  Redis  │ │对象存储 │ │外部数据 │
+│ + PostGIS│ │  缓存   │ │ 文件   │ │适配器   │
+└─────────┘ └─────────┘ └────────┘ └─────────┘
+                                    ┌─────────────────┐
+                                    │ 管理后台 (Next.js)│
+                                    └─────────────────┘
+```
+
+## 环境要求
+
+- Docker 24+ 与 Docker Compose v2
+- Node.js 18+
+- Python 3.11+
+- （可选）PostgreSQL 15+ 与 PostGIS 扩展
+
+## 快速开始
+
+```bash
+# 克隆仓库
+git clone <repo-url> floodshield
+cd floodshield
+
+# 启动全部服务
+docker compose up -d
+
+# 查看日志
+docker compose logs -f api
+```
+
+服务启动后：
+
+- API 服务：http://localhost:8000
+- API 文档（Swagger）：http://localhost:8000/docs
+- 管理后台：http://localhost:3000
+- 小程序：使用微信开发者工具导入 `apps/miniapp/`
+
+## Mock 模式
+
+MVP 阶段默认启用 mock 数据源。mock provider 提供：
+
+- 模拟官方预警（暴雨黄色/橙色/红色）
+- 模拟雨情观测
+- 模拟积水报告和道路事件
+- 模拟避险场所
+- 模拟路线规划
+
+切换到真实数据源需要：
+
+1. 在 `services/api/.env` 中配置真实 API 密钥
+2. 设置 `MOCK_PROVIDERS=false`
+3. 重启 API 服务
+
+**重要**：真实外发（短信、推送）必须显式配置凭证并经人工确认，禁止在无凭证时发送。
+
+## 演示账号
+
+| 角色 | 用户名 | 密码 | 权限范围 |
+|------|--------|------|----------|
+| 系统管理员 | admin | admin123 | 全部功能 |
+| 普通居民 | user | user123 | 查看风险、上报、路线 |
+| 社区工作者 | community | comm123 | 核验报告、维护场所 |
+| 应急管理站 | emergency | emerg123 | 跨社区态势、规则配置 |
+
+## 项目结构
+
+```
+floodshield/
+├── apps/
+│   ├── miniapp/              # Taro + React + TypeScript 居民端
+│   │   ├── src/
+│   │   │   ├── pages/        # 首页、地图、避险、我的
+│   │   │   ├── components/   # 通用组件
+│   │   │   ├── services/     # API 调用
+│   │   │   └── app.ts        # 入口
+│   │   └── project.config.json
+│   └── admin/                # Next.js + TypeScript 管理后台
+│       ├── src/
+│       │   ├── app/          # 页面路由
+│       │   ├── components/   # UI 组件
+│       │   └── lib/          # 工具函数
+│       └── next.config.js
+├── services/
+│   └── api/                  # FastAPI + Python 后端
+│       ├── app/
+│       │   ├── modules/      # 业务模块
+│       │   │   ├── auth/     # 认证与权限
+│       │   │   ├── geo/      # 空间查询
+│       │   │   ├── alerts/   # 官方预警
+│       │   │   ├── observations/  # 雨情、传感器、公众报告
+│       │   │   ├── risk/     # 风险计算
+│       │   │   ├── routes/   # 路线规划
+│       │   │   ├── shelters/ # 避险场所
+│       │   │   ├── notifications/ # 通知闭环
+│       │   │   ├── ai/       # AI 辅助
+│       │   │   └── audit/    # 审计日志
+│       │   ├── providers/    # 外部数据适配器
+│       │   ├── core/         # 配置、数据库、安全
+│       │   └── main.py       # FastAPI 入口
+│       ├── tests/            # 测试
+│       └── requirements.txt
+├── docs/                     # 项目文档
+├── docker-compose.yml        # 本地开发环境
+├── FLOOD_PLATFORM_SPEC.md    # 产品规格说明书
+├── CLAUDE.md                 # Claude Code 项目约定
+└── README.md                 # 本文件
+```
+
+## API 文档
+
+启动 API 服务后访问：
+
+- Swagger UI：http://localhost:8000/docs
+- ReDoc：http://localhost:8000/redoc
+- OpenAPI JSON：http://localhost:8000/openapi.json
+
+接口统一返回 `requestId`、`dataStatus`、时间戳和来源字段。
+
+### 主要接口
+
+**居民端**
+
+```
+GET  /v1/areas/resolve?lat=&lng=
+GET  /v1/nearby/summary?areaId=&lat=&lng=
+GET  /v1/alerts?areaId=&active=true
+GET  /v1/map/layers?areaId=&types=
+GET  /v1/shelters/nearby?lat=&lng=&accessibility=
+POST /v1/hazard-reports
+POST /v1/routes/evacuation
+POST /v1/voice/announcement
+```
+
+**管理后台**
+
+```
+GET   /v1/admin/risk/overview
+GET   /v1/admin/reports?state=pending_review
+POST  /v1/admin/reports/{id}/verify
+POST  /v1/admin/reports/{id}/reject
+POST  /v1/admin/tasks
+POST  /v1/admin/notifications/dispatch
+GET   /v1/admin/audit-logs
+```
+
+**内部采集**
+
+```
+POST /internal/ingestion/{sourceId}/warnings
+POST /internal/ingestion/{sourceId}/rainfall
+POST /internal/risk/recompute
+```
+
+## 测试
+
+```bash
+# 后端测试
+cd services/api
+pytest
+
+# 带覆盖率
+pytest --cov=app --cov-report=html
+
+# 前端测试（管理后台）
+cd apps/admin
+npm test
+
+# 前端测试（居民端）
+cd apps/miniapp
+npm test
+```
+
+测试分类：
+
+- `tests/unit/` — 单元测试（风险计算、数据校验、权限）
+- `tests/integration/` — 集成测试（API 接口、数据库交互）
+- `tests/e2e/` — 端到端测试（完整业务流程）
+
+详见 [docs/test-matrix.md](docs/test-matrix.md)。
+
+## 环境变量
+
+### API 服务 (services/api/.env)
+
+```bash
+# 数据库
+DATABASE_URL=postgresql+asyncpg://floodshield:floodshield@localhost:5432/floodshield
+REDIS_URL=redis://localhost:6379/0
+
+# 安全
+SECRET_KEY=change-me-in-production
+JWT_ALGORITHM=HS256
+JWT_EXPIRE_MINUTES=1440
+
+# Mock 模式
+MOCK_PROVIDERS=true
+
+# 外部数据源（真实模式需要）
+WEATHER_API_KEY=
+WEATHER_API_URL=
+MAP_API_KEY=
+MAP_API_URL=
+SMS_API_KEY=
+SMS_API_SECRET=
+
+# AI 服务
+AI_ENABLED=true
+AI_PROVIDER=mock
+AI_API_KEY=
+AI_MODEL=gpt-4
+
+# 文件存储
+STORAGE_TYPE=local
+STORAGE_PATH=./uploads
+
+# 日志
+LOG_LEVEL=INFO
+AUDIT_LOG_ENABLED=true
+```
+
+### 管理后台 (apps/admin/.env.local)
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_VERSION=v1
+```
+
+### 居民端 (apps/miniapp/.env)
+
+```bash
+TARO_APP_API_URL=http://localhost:8000
+TARO_APP_MAP_KEY=
+```
+
+## 贡献指南
+
+1. Fork 本仓库
+2. 创建功能分支：`git checkout -b feature/your-feature`
+3. 提交前确保测试通过：`pytest && npm test`
+4. 提交 PR 并描述变更内容
+
+### 代码规范
+
+- Python：遵循 PEP 8，使用 ruff 格式化
+- TypeScript：使用 ESLint + Prettier
+- 每个安全关键分支必须有对应测试
+- API 改动必须同步更新 OpenAPI 文档和前端类型
+
+### 提交规范
+
+```
+feat: 新功能
+fix: 修复
+docs: 文档
+test: 测试
+refactor: 重构
+chore: 构建/工具
+```
+
+## 许可证
+
+MIT License
+
+## 数据安全免责声明
+
+1. **非官方预警源**：汛安平台风险结论基于多源数据综合计算，不构成法定预警。所有预警信息以属地气象、水务、应急管理部门官方发布为准。
+
+2. **数据时效性**：平台展示的数据带有观测时间和有效期。超过有效期的数据可能已过期，请以现场标志和官方最新指令为准。
+
+3. **路线参考性**：路线建议基于地图供应商数据和平台风险重排，不能替代现场判断。请以实际道路标志和官方管制信息为准。
+
+4. **位置隐私**：平台默认不做后台持续定位。公众报告的位置经过空间模糊处理（约 100 米范围）。精确位置仅在核验和救援协同等明确目的下短期保存。
+
+5. **AI 辅助定位**：AI 功能仅用于信息摘要、分类和辅助决策，不用于决定预警等级、发布高危消息或确认救援状态。
+
+6. **数据来源**：平台数据来自官方授权、平台计算和公众观测三个层级，每个数据来源均标注来源、授权状态和可信等级。
