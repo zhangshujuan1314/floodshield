@@ -102,7 +102,7 @@ export default function TasksPage() {
 
   const doAdvanceStatus = async () => {
     if (!confirmAdvance) return;
-    await updateTaskStatus(confirmAdvance.taskId, confirmAdvance.status);
+    await updateTaskStatus(confirmAdvance.taskId, confirmAdvance.nextStatus);
     setConfirmAdvance(null);
     mutate();
   };
