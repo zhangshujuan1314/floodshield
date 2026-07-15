@@ -1,4 +1,9 @@
+import logging
+import warnings
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -13,6 +18,18 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "dev-secret-change-in-production"
     API_PREFIX: str = "/v1"
     INTERNAL_PREFIX: str = "/internal"
+    ALLOWED_ORIGINS: list[str] = ["*"]
 
 
 settings = Settings()
+
+if not settings.MOCK_MODE and "*" in settings.ALLOWED_ORIGINS:
+    warnings.warn(
+        "ALLOWED_ORIGINS contains '*' in production mode. "
+        "Set ALLOWED_ORIGINS to explicit origins for security.",
+        stacklevel=2,
+    )
+    logger.warning(
+        "ALLOWED_ORIGINS contains '*' in production mode. "
+        "Set ALLOWED_ORIGINS to explicit origins for security."
+    )

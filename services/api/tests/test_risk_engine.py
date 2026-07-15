@@ -171,3 +171,83 @@ class TestOutOfRangeInputs:
         result = compute_risk(signals, now=now)
         oor = [s for s in result.signals if s.data_status == "out_of_range"]
         assert len(oor) >= 1
+
+
+class TestUnknownRiskLevel:
+    """Critical safety test: when ALL signals are missing, risk_level must be 'unknown',
+    NOT 'low' or 'normal'. Missing data must NEVER be interpreted as safe."""
+
+    def test_all_missing_returns_unknown_risk_level(self):
+        """The most dangerous antipattern: no data = green/safe."""
+        now = _now()
+        result = compute_risk({}, now=now)
+        assert result.risk_level == "unknown"
+        assert result.risk_score == 0.0
+        assert result.confidence == 0.0
+        assert result.data_status == "degraded"
+
+    def test_unknown_is_not_low(self):
+        """Ensure 'unknown' is distinct from 'low' — they must not be confused."""
+        now = _now()
+        # All missing → unknown
+        unknown_result = compute_risk({}, now=now)
+        # All normal low → low
+        low_result = compute_risk({
+            "rainfall_mm": SignalInput(value=1.0, observed_at=now - timedelta(minutes=5)),
+            "water_level_m": SignalInput(value=0.3, observed_at=now - timedelta(minutes=5)),
+            "alert_severity": SignalInput(value=0.0, observed_at=now - timedelta(minutes=5)),
+            "ground_saturation": SignalInput(value=0.1, observed_at=now - timedelta(minutes=5)),
+            "drainage_capacity": SignalInput(value=0.95, observed_at=now - timedelta(minutes=5)),
+        }, now=now)
+        assert unknown_result.risk_level == "unknown"
+        assert low_result.risk_level == "low"
+        assert unknown_result.risk_level != low_result.risk_level
+
+    def test_partial_missing_not_unknown(self):
+        """If at least one signal is available, risk_level should not be 'unknown'."""
+        now = _now()
+        signals = {
+            "rainfall_mm": SignalInput(value=20.0, observed_at=now - timedelta(minutes=10)),
+            # All others missing
+        }
+        result = compute_risk(signals, now=now)
+        assert result.risk_level != "unknown"
+        assert result.risk_level in ("low", "medium", "high", "extreme")
+
+
+class TestRuleVersionReplay:
+    """Risk snapshots must be reproducible from input snapshots."""
+
+    def test_same_inputs_same_output(self):
+        """Given identical inputs, risk engine must produce identical results."""
+        now = _now()
+        signals = {
+            "rainfall_mm": SignalInput(value=50.0, observed_at=now - timedelta(minutes=15)),
+            "water_level_m": SignalInput(value=2.5, observed_at=now - timedelta(minutes=10)),
+            "alert_severity": SignalInput(value=2.0, observed_at=now - timedelta(minutes=30)),
+            "ground_saturation": SignalInput(value=0.5, observed_at=now - timedelta(hours=1)),
+            "drainage_capacity": SignalInput(value=0.5, observed_at=now - timedelta(hours=1)),
+        }
+        result1 = compute_risk(signals, now=now)
+        result2 = compute_risk(signals, now=now)
+        assert result1.risk_score == result2.risk_score
+        assert result1.risk_level == result2.risk_level
+        assert result1.confidence == result2.confidence
+        assert result1.data_status == result2.data_status
+        assert result1.conflicts == result2.conflicts
+
+    def test_boundary_values(self):
+        """Test exact threshold boundaries."""
+        now = _now()
+        # Exactly at "medium" threshold for rainfall (30mm)
+        signals = {
+            "rainfall_mm": SignalInput(value=30.0, observed_at=now - timedelta(minutes=10)),
+            "water_level_m": SignalInput(value=0.5, observed_at=now - timedelta(minutes=5)),
+            "alert_severity": SignalInput(value=0.0, observed_at=now - timedelta(minutes=5)),
+            "ground_saturation": SignalInput(value=0.1, observed_at=now - timedelta(minutes=5)),
+            "drainage_capacity": SignalInput(value=0.9, observed_at=now - timedelta(minutes=5)),
+        }
+        result = compute_risk(signals, now=now)
+        # At threshold, should be at least "medium" level contribution
+        rainfall_signal = next(s for s in result.signals if s.signal == "rainfall_mm")
+        assert rainfall_signal.sub_score >= 0.5  # medium threshold

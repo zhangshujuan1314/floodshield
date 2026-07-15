@@ -12,6 +12,7 @@ dependencies = [
     "uvicorn[standard]",
     "sqlalchemy[asyncio]>=2.0",
     "asyncpg",
+    "geoalchemy2",
     "alembic",
     "pydantic>=2.0",
     "pydantic-settings",

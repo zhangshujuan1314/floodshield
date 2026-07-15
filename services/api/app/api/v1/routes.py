@@ -16,6 +16,7 @@ TZ_SHANGHAI = timezone(timedelta(hours=8))
 async def compute_evacuation_route(body: EvacuationRouteRequest, request: Request):
     request_id = getattr(request.state, "request_id", "")
     now = datetime.now(TZ_SHANGHAI)
+    start_ms = datetime.now().timestamp() * 1000
 
     map_provider = provider_factory("map", settings.MAP_PROVIDER)
     result = await map_provider.compute_route(
@@ -24,6 +25,8 @@ async def compute_evacuation_route(body: EvacuationRouteRequest, request: Reques
         transport_mode=body.transport_mode,
         avoid_hazards=body.avoid_hazards,
     )
+
+    calc_ms = int(datetime.now().timestamp() * 1000 - start_ms)
 
     if not result["is_viable"]:
         return {
@@ -38,6 +41,10 @@ async def compute_evacuation_route(body: EvacuationRouteRequest, request: Reques
                 "safetyScore": 0.0,
                 "warnings": result["warnings"],
                 "isViable": False,
+                "evidence": result.get("evidence", []),
+                "dataTime": now.isoformat(),
+                "expiresAt": (now + timedelta(minutes=15)).isoformat(),
+                "calculationTimeMs": calc_ms,
             },
         }
 
@@ -53,6 +60,10 @@ async def compute_evacuation_route(body: EvacuationRouteRequest, request: Reques
             "safetyScore": result["safety_score"],
             "warnings": result["warnings"],
             "isViable": True,
+            "evidence": result.get("evidence", []),
+            "dataTime": now.isoformat(),
+            "expiresAt": (now + timedelta(minutes=15)).isoformat(),
+            "calculationTimeMs": calc_ms,
         },
     }
 

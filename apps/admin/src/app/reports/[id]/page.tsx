@@ -1,15 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
 import { fetchReport, verifyReport, rejectReport } from '@/lib/api';
+import { hasPermission, getStoredUser } from '@/lib/auth';
 import RiskBadge from '@/components/RiskBadge';
 import StatusBadge, { REPORT_STATUS_MAP, REPORT_TYPE_MAP } from '@/components/StatusBadge';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import type { Report } from '@/lib/types';
+import type { Report, User } from '@/lib/types';
 
 dayjs.extend(relativeTime);
 dayjs.locale('zh-cn');
@@ -21,6 +22,16 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
   );
   const [confirmAction, setConfirmAction] = useState<'verify' | 'reject' | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const stored = getStoredUser();
+    if (stored) setUser(stored);
+  }, []);
+
+  const canViewPreciseLocation = user ? hasPermission(user.role, 'user:precise_location') : false;
+  const canVerify = user ? hasPermission(user.role, 'report:verify') : false;
+  const canReject = user ? hasPermission(user.role, 'report:reject') : false;
 
   const handleVerify = async () => {
     await verifyReport(params.id);
@@ -128,16 +139,22 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
               <span className="text-hint">公开地址：</span>
               <span>{report.location.address}</span>
             </div>
-            {report.location.preciseAddress && (
+            {report.location.preciseAddress && canViewPreciseLocation && (
               <div style={{ marginBottom: 'var(--spacing-sm)' }}>
                 <span className="text-hint">精确地址：</span>
                 <span className="font-bold">{report.location.preciseAddress}</span>
                 <span className="text-hint" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 8 }}>(仅授权角色可见)</span>
               </div>
             )}
-            <div className="text-hint" style={{ fontSize: 'var(--font-size-xs)' }}>
-              经度: {report.location.lng} / 纬度: {report.location.lat}
-            </div>
+            {canViewPreciseLocation ? (
+              <div className="text-hint" style={{ fontSize: 'var(--font-size-xs)' }}>
+                经度: {report.location.lng} / 纬度: {report.location.lat}
+              </div>
+            ) : (
+              <div className="text-hint" style={{ fontSize: 'var(--font-size-xs)' }}>
+                位置精度已模糊化（需授权角色查看精确坐标）
+              </div>
+            )}
             {/* 地图预览占位 */}
             <div className="map-view" style={{ height: 200, marginTop: 'var(--spacing-sm)' }}>
               📍 地图预览 ({report.location.address})
@@ -181,12 +198,19 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
             <div className="card-title">操作</div>
             {report.status === 'pending_review' ? (
               <div className="report-actions">
-                <button className="btn btn-success" onClick={() => setConfirmAction('verify')}>
-                  ✅ 核验通过
-                </button>
-                <button className="btn btn-danger" onClick={() => setConfirmAction('reject')}>
-                  ❌ 驳回报告
-                </button>
+                {canVerify && (
+                  <button className="btn btn-success" onClick={() => setConfirmAction('verify')}>
+                    ✅ 核验通过
+                  </button>
+                )}
+                {canReject && (
+                  <button className="btn btn-danger" onClick={() => setConfirmAction('reject')}>
+                    ❌ 驳回报告
+                  </button>
+                )}
+                {!canVerify && !canReject && (
+                  <div className="text-hint">您没有核验或驳回报告的权限</div>
+                )}
               </div>
             ) : (
               <div className="text-hint">

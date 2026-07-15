@@ -27,7 +27,29 @@ async def nearby_summary(
         "drainage_capacity": SignalInput(value=0.6, observed_at=now - timedelta(hours=1), source="mock"),
     }
 
-    risk = compute_risk(signals, now=now)
+    try:
+        risk = compute_risk(signals, now=now)
+    except Exception:
+        return {
+            "requestId": request_id,
+            "dataStatus": "degraded",
+            "timestamp": now.isoformat(),
+            "message": "暂无法计算风险等级，请参考官方预警信息",
+            "data": {
+                "risk": {
+                    "areaId": f"area-{lat:.2f}-{lon:.2f}",
+                    "riskLevel": "unknown",
+                    "riskScore": 0.0,
+                    "confidence": 0.0,
+                    "dataStatus": "degraded",
+                    "evidence": [],
+                    "updatedAt": now.isoformat(),
+                },
+                "activeAlerts": 0,
+                "nearbyShelters": 0,
+                "roadClosures": 0,
+            },
+        }
 
     return {
         "requestId": request_id,
