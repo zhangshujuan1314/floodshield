@@ -10,7 +10,7 @@ import ExpiredBanner from '../../components/ExpiredBanner'
 import LoadingState from '../../components/LoadingState'
 import ErrorState from '../../components/ErrorState'
 import EmptyState from '../../components/EmptyState'
-import { type RiskBandKey } from '../../utils/constants'
+import { RISK_BANDS, type RiskBandKey } from '../../utils/constants'
 import './index.scss'
 
 type SearchStatus = 'idle' | 'searching' | 'done' | 'error'
@@ -45,15 +45,13 @@ export default function RoutePage() {
     setErrorMsg('')
 
     try {
-      // 使用当前位置作为起点坐标（简化处理）
       const oLat = location.latitude || 31.95
-      const oLng = location.longitude || 118.84
-      // 目的地坐标在实际场景中需要通过地理编码获取，此处使用模拟坐标
+      const oLon = location.longitude || 118.84
       const dLat = 31.9534
-      const dLng = 118.8398
+      const dLon = 118.8398
 
       try {
-        const res = await getRoutes(oLat, oLng, dLat, dLng)
+        const res = await getRoutes(oLat, oLon, dLat, dLon)
         setRoutes(res.data)
       } catch {
         // 降级到模拟数据
@@ -66,6 +64,13 @@ export default function RoutePage() {
       setErrorMsg(err instanceof Error ? err.message : '路线查询失败')
     }
   }, [origin, destination, location])
+
+  const getRouteLabelStyle = (label: string) => {
+    if (label.includes('推荐')) return { color: '#52c41a', bg: '#f6ffed', border: '#52c41a', icon: '⭐' }
+    if (label.includes('备选')) return { color: '#1890ff', bg: '#e6f7ff', border: '#1890ff', icon: '📋' }
+    if (label.includes('高风险')) return { color: '#ff4d4f', bg: '#fff2f0', border: '#ff4d4f', icon: '⚠️' }
+    return { color: '#666666', bg: '#f5f5f5', border: '#d9d9d9', icon: '🗺️' }
+  }
 
   return (
     <ScrollView className="route-page" scrollY enableFlex>
@@ -102,7 +107,7 @@ export default function RoutePage() {
             onClick={searchStatus === 'searching' ? undefined : handleSearch}
           >
             <Text className="btn-search-text">
-              {searchStatus === 'searching' ? '查询中...' : '查询安全路线'}
+              {searchStatus === 'searching' ? '查询中...' : '获取路线'}
             </Text>
           </View>
         </View>
@@ -113,6 +118,7 @@ export default function RoutePage() {
         {/* 错误 */}
         {searchStatus === 'error' && (
           <ErrorState
+            title="查询失败"
             message={errorMsg}
             retryText="重新查询"
             onRetry={handleSearch}
@@ -125,6 +131,8 @@ export default function RoutePage() {
             icon="🗺️"
             title="未找到安全路线"
             description="无法规划从出发地到目的地的安全路线，请尝试其他地点或联系救援部门"
+            actionText="重新查询"
+            onAction={handleSearch}
           />
         )}
 
@@ -133,9 +141,9 @@ export default function RoutePage() {
           <View className="routes-section">
             <Text className="section-title">推荐路线（共{routes.length}条）</Text>
 
-            {routes.map((route, routeIdx) => {
+            {routes.map((route) => {
               const overallRiskKey = route.overallRisk as RiskBandKey
-              const isExpired = checkExpired(route.expiresAt)
+              const labelStyle = getRouteLabelStyle(route.routeLabel)
 
               return (
                 <View key={route.id} className="route-card card">
@@ -147,8 +155,20 @@ export default function RoutePage() {
 
                   {/* 路线头部 */}
                   <View className="route-header">
-                    <Text className="route-label">路线 {routeIdx + 1}</Text>
-                    <RiskBadge riskKey={overallRiskKey} size="small" />
+                    <View className="route-label-area">
+                      <View
+                        className="route-label-badge"
+                        style={{
+                          backgroundColor: labelStyle.bg,
+                          borderColor: labelStyle.border,
+                        }}
+                      >
+                        <Text style={{ color: labelStyle.color, fontSize: 'var(--font-size-sm)', fontWeight: '600' }}>
+                          {labelStyle.icon} {route.routeLabel}
+                        </Text>
+                      </View>
+                      <RiskBadge riskKey={overallRiskKey} size="small" />
+                    </View>
                   </View>
 
                   {/* 路线概览 */}
@@ -163,7 +183,7 @@ export default function RoutePage() {
                     </View>
                     <View className="route-stat-divider" />
                     <View className="route-stat">
-                      <Text className="route-stat-value">{route.totalDuration}分钟</Text>
+                      <Text className="route-stat-value">{route.totalTime}分钟</Text>
                       <Text className="route-stat-label">预计时间</Text>
                     </View>
                     <View className="route-stat-divider" />
@@ -175,53 +195,62 @@ export default function RoutePage() {
 
                   {/* 路段详情 */}
                   <View className="route-segments">
-                    {route.segments.map((seg, segIdx) => (
-                      <View key={segIdx} className="segment">
-                        <View className="segment-header">
-                          <Text className="segment-label">路段 {segIdx + 1}</Text>
-                          <View
-                            className="segment-risk"
-                            style={{ backgroundColor: seg.riskColor + '20', borderColor: seg.riskColor }}
-                          >
-                            <Text style={{ color: seg.riskColor, fontSize: 'var(--font-size-xs)', fontWeight: '600' }}>
-                              {seg.riskLabel}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View className="segment-meta">
-                          <Text className="segment-meta-text">
-                            {seg.distance < 1000
-                              ? `${seg.distance}米`
-                              : `${(seg.distance / 1000).toFixed(1)}公里`}
-                            {' · '}
-                            {seg.duration}分钟
-                          </Text>
-                        </View>
-
-                        {/* 证据 */}
-                        {seg.evidence.length > 0 && (
-                          <View className="segment-evidence">
-                            <Text className="segment-evidence-title">依据：</Text>
-                            {seg.evidence.map((ev, evIdx) => (
-                              <Text key={evIdx} className="segment-evidence-item">
-                                · {ev}
+                    {route.segments.map((seg, segIdx) => {
+                      const riskBand = RISK_BANDS[seg.riskLevel as RiskBandKey]
+                      return (
+                        <View key={segIdx} className="segment">
+                          <View className="segment-header">
+                            <View className="segment-name-area">
+                              <Text className="segment-number">{segIdx + 1}</Text>
+                              <Text className="segment-road-name">{seg.roadName}</Text>
+                            </View>
+                            <View
+                              className="segment-risk"
+                              style={{
+                                backgroundColor: (riskBand?.bgColor || seg.riskColor) + '40',
+                                borderColor: riskBand?.color || seg.riskColor,
+                              }}
+                            >
+                              <Text style={{ color: riskBand?.color || seg.riskColor, fontSize: 'var(--font-size-xs)', fontWeight: '600' }}>
+                                {riskBand?.icon || '?'} {seg.riskLabel}
                               </Text>
-                            ))}
+                            </View>
                           </View>
-                        )}
 
-                        {/* 未知风险警告 */}
-                        {seg.unknownRisk && (
-                          <View className="unknown-risk-warning">
-                            <Text className="unknown-risk-icon">⚠️</Text>
-                            <Text className="unknown-risk-text">
-                              该路段缺乏实时数据，实际风险未知，请谨慎通行
+                          <View className="segment-meta">
+                            <Text className="segment-meta-text">
+                              {seg.distance < 1000
+                                ? `${seg.distance}米`
+                                : `${(seg.distance / 1000).toFixed(1)}公里`}
+                              {' · '}
+                              {seg.duration}分钟
                             </Text>
                           </View>
-                        )}
-                      </View>
-                    ))}
+
+                          {/* 证据 */}
+                          {seg.evidence.length > 0 && (
+                            <View className="segment-evidence">
+                              <Text className="segment-evidence-title">📋 依据：</Text>
+                              {seg.evidence.map((ev, evIdx) => (
+                                <Text key={evIdx} className="segment-evidence-item">
+                                  · {ev}
+                                </Text>
+                              ))}
+                            </View>
+                          )}
+
+                          {/* 未知风险警告 */}
+                          {seg.unknownRisk && (
+                            <View className="unknown-risk-warning">
+                              <Text className="unknown-risk-icon">⚠️</Text>
+                              <Text className="unknown-risk-text">
+                                该路段缺乏实时数据，实际风险未知，请谨慎通行
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      )
+                    })}
                   </View>
 
                   {/* 路线来源和过期时间 */}
@@ -254,19 +283,25 @@ export default function RoutePage() {
             <Text className="idle-hint-desc">
               输入出发地和目的地，系统将为您规划风险最低的避险路线
             </Text>
+            <View className="idle-hint-features">
+              <View className="idle-hint-feature">
+                <Text className="feature-icon">⭐</Text>
+                <Text className="feature-text">推荐最优安全路线</Text>
+              </View>
+              <View className="idle-hint-feature">
+                <Text className="feature-icon">📊</Text>
+                <Text className="feature-text">实时风险评估</Text>
+              </View>
+              <View className="idle-hint-feature">
+                <Text className="feature-icon">⚠️</Text>
+                <Text className="feature-text">未知路段警告</Text>
+              </View>
+            </View>
           </View>
         )}
       </View>
     </ScrollView>
   )
-}
-
-function checkExpired(expiresAt: string): boolean {
-  try {
-    return new Date(expiresAt).getTime() < Date.now()
-  } catch {
-    return false
-  }
 }
 
 function formatTime(isoStr: string): string {

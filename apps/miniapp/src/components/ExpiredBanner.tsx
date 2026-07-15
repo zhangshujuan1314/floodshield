@@ -7,6 +7,7 @@ interface ExpiredBannerProps {
 
 export default function ExpiredBanner({ expiresAt, onRefresh }: ExpiredBannerProps) {
   const isExpired = checkExpired(expiresAt)
+  const expiredTimeStr = isExpired ? formatExpiredTime(expiresAt) : ''
 
   if (!isExpired) return null
 
@@ -33,20 +34,34 @@ export default function ExpiredBanner({ expiresAt, onRefresh }: ExpiredBannerPro
         >
           ⏰
         </Text>
-        <Text
-          style={{
-            fontSize: 'var(--font-size-sm)',
-            color: 'var(--color-warning)',
-            fontWeight: '500',
-          }}
-        >
-          信息已过期，可能存在变化，请刷新获取最新数据
-        </Text>
+        <View>
+          <Text
+            style={{
+              fontSize: 'var(--font-size-sm)',
+              color: 'var(--color-warning)',
+              fontWeight: '500',
+              display: 'block',
+            }}
+          >
+            信息已过期，请刷新获取最新数据
+          </Text>
+          {expiredTimeStr && (
+            <Text
+              style={{
+                fontSize: 'var(--font-size-xs)',
+                color: 'var(--color-text-hint)',
+                display: 'block',
+              }}
+            >
+              过期时间：{expiredTimeStr}
+            </Text>
+          )}
+        </View>
       </View>
       {onRefresh && (
         <View
           style={{
-            padding: '6px 16px',
+            padding: '8px 20px',
             backgroundColor: 'var(--color-warning)',
             borderRadius: '999px',
             marginLeft: 'var(--spacing-sm)',
@@ -54,7 +69,7 @@ export default function ExpiredBanner({ expiresAt, onRefresh }: ExpiredBannerPro
           }}
           onClick={onRefresh}
         >
-          <Text style={{ fontSize: 'var(--font-size-xs)', color: '#ffffff' }}>刷新</Text>
+          <Text style={{ fontSize: 'var(--font-size-xs)', color: '#ffffff', fontWeight: '600' }}>刷新</Text>
         </View>
       )}
     </View>
@@ -66,5 +81,16 @@ function checkExpired(expiresAt: string): boolean {
     return new Date(expiresAt).getTime() < Date.now()
   } catch {
     return false
+  }
+}
+
+function formatExpiredTime(isoStr: string): string {
+  try {
+    const d = new Date(isoStr)
+    const hour = d.getHours().toString().padStart(2, '0')
+    const minute = d.getMinutes().toString().padStart(2, '0')
+    return `${hour}:${minute}`
+  } catch {
+    return ''
   }
 }

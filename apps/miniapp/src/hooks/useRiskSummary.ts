@@ -10,7 +10,7 @@ interface RiskSummaryState {
   error: string | null
 }
 
-export function useRiskSummary(lat: number | null, lng: number | null) {
+export function useRiskSummary(lat: number | null, lon: number | null) {
   const [state, setState] = useState<RiskSummaryState>({
     data: null,
     loading: false,
@@ -18,12 +18,12 @@ export function useRiskSummary(lat: number | null, lng: number | null) {
   })
 
   const fetchData = useCallback(async () => {
-    if (lat === null || lng === null) return
+    if (lat === null || lon === null) return
 
     setState((prev) => ({ ...prev, loading: true, error: null }))
 
     try {
-      const res = await getRiskSummary(lat, lng)
+      const res = await getRiskSummary(lat, lon)
       setState({
         data: res.data,
         loading: false,
@@ -37,7 +37,7 @@ export function useRiskSummary(lat: number | null, lng: number | null) {
         error: null,
       })
     }
-  }, [lat, lng])
+  }, [lat, lon])
 
   useEffect(() => {
     fetchData()

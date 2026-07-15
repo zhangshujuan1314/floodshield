@@ -161,26 +161,58 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
             </div>
           </div>
 
-          {/* 核验历史 */}
+          {/* 操作历史时间线 */}
           <div className="card">
             <div className="card-title">操作历史</div>
-            {report.auditTrail.map((action, i) => (
-              <div key={i} style={{
-                padding: 'var(--spacing-sm) 0',
-                borderBottom: i < report.auditTrail.length - 1 ? '1px solid var(--color-border-light)' : 'none',
-              }}>
-                <div className="flex items-center justify-between">
-                  <span className="font-bold">{action.action}</span>
-                  <span className="text-hint" style={{ fontSize: 'var(--font-size-xs)' }}>
-                    {dayjs(action.timestamp).format('MM-DD HH:mm:ss')}
-                  </span>
+            {report.auditTrail.map((action, i) => {
+              const isVerify = action.action.includes('核验');
+              const isReject = action.action.includes('驳回');
+              const isCreate = action.action.includes('创建');
+              const dotColor = isVerify ? 'var(--color-safe)' : isReject ? 'var(--color-danger)' : isCreate ? 'var(--color-primary)' : 'var(--color-text-hint)';
+              return (
+                <div key={i} style={{
+                  display: 'flex',
+                  gap: 'var(--spacing-md)',
+                  padding: 'var(--spacing-sm) 0',
+                  borderBottom: i < report.auditTrail.length - 1 ? '1px solid var(--color-border-light)' : 'none',
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4 }}>
+                    <div style={{
+                      width: 12, height: 12, borderRadius: '50%', background: dotColor,
+                      border: '2px solid white', boxShadow: '0 0 0 2px ' + dotColor,
+                    }} />
+                    {i < report.auditTrail.length - 1 && (
+                      <div style={{ width: 2, flex: 1, background: 'var(--color-border-light)', marginTop: 4 }} />
+                    )}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold">{action.action}</span>
+                      <span className="text-hint" style={{ fontSize: 'var(--font-size-xs)' }}>
+                        {dayjs(action.timestamp).format('MM-DD HH:mm:ss')}
+                      </span>
+                    </div>
+                    <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                      {action.actor} ({action.actorRole === 'admin' ? '管理员' : action.actorRole === 'community' ? '社区' : '应急站'})
+                      {action.detail && ` - ${action.detail}`}
+                    </div>
+                    {action.before && action.after && (
+                      <div style={{ marginTop: 4, display: 'flex', gap: 'var(--spacing-sm)', fontSize: 'var(--font-size-xs)' }}>
+                        <span className="text-hint">变更前:</span>
+                        <code style={{ background: '#fff2f0', padding: '1px 4px', borderRadius: 2 }}>
+                          {JSON.stringify(action.before)}
+                        </code>
+                        <span className="text-hint">→</span>
+                        <span className="text-hint">变更后:</span>
+                        <code style={{ background: '#f6ffed', padding: '1px 4px', borderRadius: 2 }}>
+                          {JSON.stringify(action.after)}
+                        </code>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
-                  {action.actor} ({action.actorRole})
-                  {action.detail && ` - ${action.detail}`}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* 驳回原因 */}

@@ -25,13 +25,16 @@ const RESOURCE_OPTIONS = [
   { value: 'task', label: '任务' },
   { value: 'shelter', label: '避险场所' },
   { value: 'notification', label: '通知' },
+  { value: 'road_event', label: '道路事件' },
 ];
 
 export default function AuditPage() {
   const [filters, setFilters] = useState({
     role: '',
-    resource: '',
+    resourceType: '',
     requestId: '',
+    from: '',
+    to: '',
     page: 1,
   });
   const [detailEntry, setDetailEntry] = useState<AuditLog | null>(null);
@@ -40,16 +43,98 @@ export default function AuditPage() {
     ['audit-logs', filters],
     () => fetchAuditLogs({
       role: filters.role || undefined,
-      resource: filters.resource || undefined,
+      resourceType: filters.resourceType || undefined,
       requestId: filters.requestId || undefined,
+      from: filters.from || undefined,
+      to: filters.to || undefined,
       page: filters.page,
       pageSize: 10,
     })
   );
 
+  const handleExport = () => {
+    // Placeholder: in production, would call an export API or generate CSV client-side
+    const rows = (data?.items || []).map(entry => ({
+      时间: dayjs(entry.timestamp).format('YYYY-MM-DD HH:mm:ss'),
+      操作者: entry.actor,
+      角色: entry.actorRole,
+      操作: entry.action,
+      资源: `${entry.resource}/${entry.resourceId}`,
+      详情: entry.detail || '',
+      请求ID: entry.requestId,
+      IP: entry.ip,
+    }));
+    const csv = [
+      Object.keys(rows[0] || {}).join(','),
+      ...rows.map(r => Object.values(r).map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')),
+    ].join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit-logs-${dayjs().format('YYYYMMDD-HHmmss')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const renderDiffView = (before?: Record<string, unknown>, after?: Record<string, unknown>) => {
+    if (!before && !after) return null;
+    const allKeys = new Set([
+      ...Object.keys(before || {}),
+      ...Object.keys(after || {}),
+    ]);
+    return (
+      <div style={{ marginTop: 'var(--spacing-sm)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-sm)' }}>
+          <div>
+            <div className="form-label" style={{ fontSize: 'var(--font-size-xs)', marginBottom: 4 }}>变更前</div>
+            <pre className="json-view" style={{ fontSize: 'var(--font-size-xs)', maxHeight: 200 }}>
+              {before ? JSON.stringify(before, null, 2) : '(无)'}
+            </pre>
+          </div>
+          <div>
+            <div className="form-label" style={{ fontSize: 'var(--font-size-xs)', marginBottom: 4 }}>变更后</div>
+            <pre className="json-view" style={{ fontSize: 'var(--font-size-xs)', maxHeight: 200 }}>
+              {after ? JSON.stringify(after, null, 2) : '(无)'}
+            </pre>
+          </div>
+        </div>
+        {/* Field-level diff */}
+        {before && after && (
+          <div style={{ marginTop: 'var(--spacing-sm)' }}>
+            <div className="form-label" style={{ fontSize: 'var(--font-size-xs)', marginBottom: 4 }}>字段差异</div>
+            <div style={{ background: '#fafafa', borderRadius: 'var(--radius-sm)', padding: 'var(--spacing-sm)', fontSize: 'var(--font-size-xs)' }}>
+              {Array.from(allKeys).map(key => {
+                const bVal = before[key];
+                const aVal = after[key];
+                if (JSON.stringify(bVal) === JSON.stringify(aVal)) return null;
+                return (
+                  <div key={key} style={{ display: 'flex', gap: 'var(--spacing-sm)', padding: '2px 0', borderBottom: '1px solid var(--color-border-light)' }}>
+                    <span style={{ fontFamily: 'monospace', minWidth: 100, color: 'var(--color-text-secondary)' }}>{key}</span>
+                    <span style={{ color: 'var(--color-danger)', textDecoration: 'line-through', flex: 1 }}>
+                      {bVal !== undefined ? JSON.stringify(bVal) : '(无)'}
+                    </span>
+                    <span style={{ color: 'var(--color-safe)', flex: 1 }}>
+                      {aVal !== undefined ? JSON.stringify(aVal) : '(无)'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div>
-      <h2 className="section-title">审计日志</h2>
+      <div className="flex items-center justify-between mb-lg">
+        <h2 className="section-title" style={{ marginBottom: 0 }}>审计日志</h2>
+        <button className="btn btn-secondary" onClick={handleExport}>
+          📤 导出CSV
+        </button>
+      </div>
 
       {/* 筛选栏 */}
       <div className="card mb-md">
@@ -70,8 +155,8 @@ export default function AuditPage() {
             <label className="form-label">资源类型</label>
             <select
               className="form-select"
-              value={filters.resource}
-              onChange={e => setFilters(prev => ({ ...prev, resource: e.target.value, page: 1 }))}
+              value={filters.resourceType}
+              onChange={e => setFilters(prev => ({ ...prev, resourceType: e.target.value, page: 1 }))}
             >
               {RESOURCE_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -86,6 +171,24 @@ export default function AuditPage() {
               placeholder="搜索请求ID"
               value={filters.requestId}
               onChange={e => setFilters(prev => ({ ...prev, requestId: e.target.value, page: 1 }))}
+            />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">开始日期</label>
+            <input
+              type="datetime-local"
+              className="form-input"
+              value={filters.from}
+              onChange={e => setFilters(prev => ({ ...prev, from: e.target.value, page: 1 }))}
+            />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">结束日期</label>
+            <input
+              type="datetime-local"
+              className="form-input"
+              value={filters.to}
+              onChange={e => setFilters(prev => ({ ...prev, to: e.target.value, page: 1 }))}
             />
           </div>
         </div>
@@ -147,7 +250,7 @@ export default function AuditPage() {
               </div>
               <div className="flex justify-between mb-sm">
                 <span className="text-hint">操作人</span>
-                <span>{detailEntry.actor} ({detailEntry.actorRole})</span>
+                <span>{detailEntry.actor} ({detailEntry.actorRole === 'admin' ? '管理员' : detailEntry.actorRole === 'community' ? '社区' : '应急站'})</span>
               </div>
               <div className="flex justify-between mb-sm">
                 <span className="text-hint">资源</span>
@@ -175,19 +278,8 @@ export default function AuditPage() {
               )}
             </div>
 
-            {detailEntry.before && (
-              <div className="mb-md">
-                <div className="form-label">变更前 (Before)</div>
-                <pre className="json-view">{JSON.stringify(detailEntry.before, null, 2)}</pre>
-              </div>
-            )}
-
-            {detailEntry.after && (
-              <div className="mb-md">
-                <div className="form-label">变更后 (After)</div>
-                <pre className="json-view">{JSON.stringify(detailEntry.after, null, 2)}</pre>
-              </div>
-            )}
+            {/* Diff 视图 */}
+            {renderDiffView(detailEntry.before, detailEntry.after)}
 
             <div className="dialog-actions">
               <button className="btn btn-secondary" onClick={() => setDetailEntry(null)}>关闭</button>

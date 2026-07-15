@@ -17,6 +17,7 @@ export default function SheltersPage() {
   const [shelters, setShelters] = useState<ShelterData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     if (!location.latitude || !location.longitude) return
@@ -45,6 +46,7 @@ export default function SheltersPage() {
   }, [location, fetchData])
 
   const handleCall = (phone: string) => {
+    if (!phone) return
     Taro.makePhoneCall({ phoneNumber: phone }).catch(() => {
       Taro.showToast({ title: '拨号失败', icon: 'none' })
     })
@@ -53,12 +55,16 @@ export default function SheltersPage() {
   const handleNavigate = (shelter: ShelterData) => {
     Taro.openLocation({
       latitude: shelter.lat,
-      longitude: shelter.lng,
+      longitude: shelter.lon,
       name: shelter.name,
       address: shelter.address,
     }).catch(() => {
       Taro.showToast({ title: '打开导航失败', icon: 'none' })
     })
+  }
+
+  const toggleExpand = (id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id))
   }
 
   // 位置权限被拒
@@ -118,7 +124,7 @@ export default function SheltersPage() {
         <View className="page-header">
           <Text className="page-title">附近避险点</Text>
           <Text className="page-subtitle">
-            共 {sortedShelters.length} 个避险点
+            共 {sortedShelters.length} 个避险点，按距离排序
           </Text>
         </View>
 
@@ -130,28 +136,40 @@ export default function SheltersPage() {
             shelter.capacity > 0
               ? Math.round((shelter.currentCount / shelter.capacity) * 100)
               : 0
+          const isExpanded = expandedId === shelter.id
+
+          // 容量条颜色逻辑
+          const barColor = capacityPercent >= 90
+            ? SHELTER_STATUS.full.color
+            : capacityPercent >= 70
+              ? SHELTER_STATUS.limited.color
+              : SHELTER_STATUS.open.color
 
           return (
             <View key={shelter.id} className="shelter-card card">
               {/* 头部：名称 + 状态 */}
-              <View className="shelter-header">
+              <View className="shelter-header" onClick={() => toggleExpand(shelter.id)}>
                 <View className="shelter-name-area">
                   <Text className="shelter-name">{shelter.name}</Text>
-                  {shelter.verified ? (
-                    <View className="badge-verified">
-                      <Text className="badge-text">已核验</Text>
-                    </View>
-                  ) : (
-                    <View className="badge-unverified">
-                      <Text className="badge-text">待核验</Text>
-                    </View>
-                  )}
+                  <View className="shelter-badges">
+                    {shelter.verified ? (
+                      <View className="badge-verified">
+                        <Text className="badge-icon">✅</Text>
+                        <Text className="badge-text">已核验</Text>
+                      </View>
+                    ) : (
+                      <View className="badge-unverified">
+                        <Text className="badge-icon">⏳</Text>
+                        <Text className="badge-text">待核验</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
                 <View
                   className="status-pill"
-                  style={{ backgroundColor: status.color }}
+                  style={{ backgroundColor: status.color + '20', borderColor: status.color }}
                 >
-                  <Text className="status-pill-text">
+                  <Text className="status-pill-text" style={{ color: status.color }}>
                     {status.icon} {status.label}
                   </Text>
                 </View>
@@ -177,6 +195,7 @@ export default function SheltersPage() {
                   <Text className="capacity-label">容量</Text>
                   <Text className="capacity-numbers">
                     {shelter.currentCount}/{shelter.capacity}
+                    <Text className="capacity-percent">（{capacityPercent}%）</Text>
                   </Text>
                 </View>
                 <View className="capacity-bar-bg">
@@ -184,7 +203,7 @@ export default function SheltersPage() {
                     className="capacity-bar-fill"
                     style={{
                       width: `${Math.min(capacityPercent, 100)}%`,
-                      backgroundColor: status.color,
+                      backgroundColor: barColor,
                     }}
                   />
                 </View>
@@ -206,13 +225,52 @@ export default function SheltersPage() {
                 )}
               </View>
 
+              {/* 展开详情 */}
+              {isExpanded && (
+                <View className="shelter-detail">
+                  <View className="detail-divider" />
+                  <View className="detail-row">
+                    <Text className="detail-label">开放状态</Text>
+                    <View className="detail-value" style={{ color: status.color }}>
+                      <Text className="detail-icon">{status.icon}</Text>
+                        <Text style={{ color: status.color }}>{status.label}</Text>
+                    </View>
+                  </View>
+                  <View className="detail-row">
+                    <Text className="detail-label">无障碍</Text>
+                    <Text className="detail-value">
+                      {shelter.accessible ? '♿ 支持' : '❌ 不支持'}
+                    </Text>
+                  </View>
+                  <View className="detail-row">
+                    <Text className="detail-label">核验状态</Text>
+                    <Text className="detail-value">
+                      {shelter.verified ? '✅ 已核验' : '⏳ 待核验'}
+                    </Text>
+                  </View>
+                  <View className="detail-row">
+                    <Text className="detail-label">更新时间</Text>
+                    <Text className="detail-value">{formatTime(shelter.updatedAt)}</Text>
+                  </View>
+                </View>
+              )}
+
               {/* 操作按钮 */}
               <View className="shelter-actions">
                 <View
                   className="btn-navigate"
                   onClick={() => handleNavigate(shelter)}
                 >
+                  <Text className="btn-navigate-icon">🧭</Text>
                   <Text className="btn-navigate-text">导航前往</Text>
+                </View>
+                <View
+                  className="btn-expand"
+                  onClick={() => toggleExpand(shelter.id)}
+                >
+                  <Text className="btn-expand-text">
+                    {isExpanded ? '收起详情' : '查看详情'}
+                  </Text>
                 </View>
               </View>
 
@@ -232,4 +290,17 @@ export default function SheltersPage() {
       </View>
     </ScrollView>
   )
+}
+
+function formatTime(isoStr: string): string {
+  try {
+    const d = new Date(isoStr)
+    const month = (d.getMonth() + 1).toString().padStart(2, '0')
+    const day = d.getDate().toString().padStart(2, '0')
+    const hour = d.getHours().toString().padStart(2, '0')
+    const minute = d.getMinutes().toString().padStart(2, '0')
+    return `${month}-${day} ${hour}:${minute}`
+  } catch {
+    return ''
+  }
 }

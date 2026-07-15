@@ -7,8 +7,16 @@ interface DataFreshnessProps {
   source?: string
 }
 
+const FRESHNESS_ICONS: Record<string, string> = {
+  fresh: '🟢',
+  partial: '🟡',
+  stale: '🔴',
+  unknown: '⚪',
+}
+
 export default function DataFreshness({ freshness, updatedAt, source }: DataFreshnessProps) {
   const level = FRESHNESS_LEVELS[freshness] || FRESHNESS_LEVELS.unknown
+  const icon = FRESHNESS_ICONS[freshness] || FRESHNESS_ICONS.unknown
   const timeStr = updatedAt ? formatRelativeTime(updatedAt) : ''
 
   return (
@@ -16,17 +24,21 @@ export default function DataFreshness({ freshness, updatedAt, source }: DataFres
       style={{
         display: 'flex',
         alignItems: 'center',
+        flexWrap: 'wrap',
         padding: 'var(--spacing-sm) var(--spacing-md)',
         backgroundColor: '#f9f9f9',
         borderRadius: 'var(--radius-sm)',
         marginTop: 'var(--spacing-sm)',
       }}
     >
-      {/* 状态指示点 + 文字 */}
+      {/* 图标 + 文字 + 色点 */}
+      <Text style={{ fontSize: 'var(--font-size-xs)', marginRight: '4px' }}>
+        {icon}
+      </Text>
       <View
         style={{
-          width: '12px',
-          height: '12px',
+          width: '8px',
+          height: '8px',
           borderRadius: '50%',
           backgroundColor: level.color,
           marginRight: 'var(--spacing-xs)',

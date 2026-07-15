@@ -91,12 +91,23 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--spacing-md);
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
 }
 
-.route-label {
-  font-size: var(--font-size-md);
-  font-weight: 600;
-  color: var(--color-text-primary);
+.route-label-area {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.route-label-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 2px solid;
 }
 
 /* 路线概览 */
@@ -154,22 +165,48 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--spacing-xs);
+  gap: var(--spacing-sm);
 }
 
-.segment-label {
+.segment-name-area {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex: 1;
+}
+
+.segment-number {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.segment-road-name {
   font-size: var(--font-size-base);
   font-weight: 500;
   color: var(--color-text-primary);
 }
 
 .segment-risk {
+  display: inline-flex;
+  align-items: center;
   padding: 4px 12px;
   border-radius: 999px;
-  border: 1px solid;
+  border: 2px solid;
+  flex-shrink: 0;
 }
 
 .segment-meta {
   margin-bottom: var(--spacing-sm);
+  padding-left: 40px;
 }
 
 .segment-meta-text {
@@ -183,6 +220,7 @@
   padding: var(--spacing-sm) var(--spacing-md);
   border-radius: var(--radius-sm);
   margin-bottom: var(--spacing-sm);
+  margin-left: 40px;
 }
 
 .segment-evidence-title {
@@ -205,8 +243,9 @@
   align-items: flex-start;
   padding: var(--spacing-sm) var(--spacing-md);
   background: var(--color-warning-light);
-  border: 1px solid var(--color-warning);
+  border: 2px solid var(--color-warning);
   border-radius: var(--radius-sm);
+  margin-left: 40px;
 }
 
 .unknown-risk-icon {
@@ -249,8 +288,8 @@
 }
 
 .idle-hint-icon {
-  font-size: 80px;
-  margin-bottom: var(--spacing-lg);
+  font-size: 64px;
+  margin-bottom: var(--spacing-md);
 }
 
 .idle-hint-title {
@@ -265,4 +304,31 @@
   color: var(--color-text-hint);
   text-align: center;
   line-height: 1.5;
+  margin-bottom: var(--spacing-lg);
+}
+
+.idle-hint-features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  width: 100%;
+  max-width: 400px;
+}
+
+.idle-hint-feature {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: #f9f9f9;
+  border-radius: var(--radius-sm);
+}
+
+.feature-icon {
+  font-size: var(--font-size-md);
+}
+
+.feature-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
 }

@@ -325,6 +325,12 @@ a:hover {
   font-size: var(--font-size-xs);
 }
 
+.risk-unknown {
+  background: #fafafa;
+  color: #8c8c8c;
+  border: 1px solid #d9d9d9;
+}
+
 .risk-normal {
   background: var(--color-safe-light);
   color: #389e0d;

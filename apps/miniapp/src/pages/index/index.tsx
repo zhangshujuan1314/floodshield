@@ -2,6 +2,7 @@ import { View, Text, ScrollView } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useState, useEffect, useCallback } from 'react'
 import { useLocation } from '../../hooks/useLocation'
+import { useNetwork, getCacheData, setCacheData, getCacheAge } from '../../hooks/useNetwork'
 import { getRiskSummary, getEvidenceList } from '../../services/api'
 import { getMockRiskSummary, getMockEvidence } from '../../services/mock'
 import type { RiskSummaryData, EvidenceItem } from '../../services/api'
@@ -17,16 +18,31 @@ import './index.scss'
 
 export default function IndexPage() {
   const location = useLocation()
+  const network = useNetwork()
   const [riskData, setRiskData] = useState<RiskSummaryData | null>(null)
   const [evidence, setEvidence] = useState<EvidenceItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [cacheTimestamp, setCacheTimestamp] = useState<number | null>(null)
 
   const fetchData = useCallback(async () => {
     if (!location.latitude || !location.longitude) return
 
     setLoading(true)
     setError(null)
+
+    // 先尝试从缓存加载
+    if (!network.isConnected) {
+      const cachedRisk = getCacheData<RiskSummaryData>('risk_summary')
+      const cachedEvidence = getCacheData<EvidenceItem[]>('evidence_list')
+      if (cachedRisk.data) {
+        setRiskData(cachedRisk.data)
+        setEvidence(cachedEvidence.data || [])
+        setCacheTimestamp(cachedRisk.timestamp)
+        setLoading(false)
+        return
+      }
+    }
 
     try {
       const [riskRes, evidenceRes] = await Promise.all([
@@ -35,14 +51,28 @@ export default function IndexPage() {
       ])
       setRiskData(riskRes.data)
       setEvidence(evidenceRes.data)
+
+      // 缓存数据
+      setCacheData('risk_summary', riskRes.data)
+      setCacheData('evidence_list', evidenceRes.data)
+      setCacheTimestamp(Date.now())
     } catch {
-      // 降级到模拟数据
-      setRiskData(getMockRiskSummary())
-      setEvidence(getMockEvidence())
+      // 降级到缓存，再降级到 mock
+      const cachedRisk = getCacheData<RiskSummaryData>('risk_summary')
+      const cachedEvidence = getCacheData<EvidenceItem[]>('evidence_list')
+      if (cachedRisk.data) {
+        setRiskData(cachedRisk.data)
+        setEvidence(cachedEvidence.data || [])
+        setCacheTimestamp(cachedRisk.timestamp)
+      } else {
+        setRiskData(getMockRiskSummary())
+        setEvidence(getMockEvidence())
+        setCacheTimestamp(null)
+      }
     } finally {
       setLoading(false)
     }
-  }, [location.latitude, location.longitude])
+  }, [location.latitude, location.longitude, network.isConnected])
 
   useEffect(() => {
     if (location.latitude && location.longitude) {
@@ -53,17 +83,30 @@ export default function IndexPage() {
     }
   }, [location, fetchData])
 
+  // 网络恢复时自动刷新
+  useEffect(() => {
+    if (network.isConnected && !network.isChecking && riskData && cacheTimestamp) {
+      fetchData()
+    }
+  }, [network.isConnected])
+
   const goToReport = () => Taro.navigateTo({ url: '/pages/report/index' })
   const goToRoute = () => Taro.navigateTo({ url: '/pages/route/index' })
   const goToShelters = () => Taro.switchTab({ url: '/pages/shelters/index' })
 
   // 位置权限被拒 — 仍可手动选择区域查看风险
-  // 核心公共功能不能因位置权限拒绝而阻断
   const [manualArea, setManualArea] = useState<string | null>(null)
 
   if (!location.loading && location.permissionDenied && !manualArea) {
     return (
       <View className="container">
+        {/* 离线横幅 */}
+        {!network.isConnected && (
+          <View className="offline-banner">
+            <Text className="offline-banner-text">⚠️ 当前无网络连接，显示缓存数据</Text>
+          </View>
+        )}
+
         <View className="card" style={{ padding: '32rpx', textAlign: 'center' }}>
           <Text style={{ fontSize: '48rpx', marginBottom: '16rpx' }}>📍</Text>
           <Text style={{ fontSize: '32rpx', fontWeight: 'bold', marginBottom: '16rpx' }}>
@@ -74,20 +117,20 @@ export default function IndexPage() {
           </Text>
           <View
             className="btn-primary"
-            style={{ marginBottom: '16rpx', padding: '16rpx 32rpx', background: '#1890ff', color: '#fff', borderRadius: '8rpx' }}
+            style={{ marginBottom: '16rpx', padding: '16rpx 32rpx' }}
             onClick={location.openSetting}
           >
-            <Text style={{ color: '#fff' }}>开启位置权限</Text>
+            <Text className="btn-text">开启位置权限</Text>
           </View>
           <View
             className="btn-secondary"
-            style={{ padding: '16rpx 32rpx', border: '1rpx solid #d9d9d9', borderRadius: '8rpx' }}
+            style={{ padding: '16rpx 32rpx' }}
             onClick={() => {
               setManualArea('demo_area_001')
               fetchData()
             }}
           >
-            <Text>手动选择区域</Text>
+            <Text className="btn-text-secondary">手动选择区域</Text>
           </View>
         </View>
       </View>
@@ -98,6 +141,12 @@ export default function IndexPage() {
   if (loading || location.loading) {
     return (
       <View className="container">
+        {/* 离线横幅 */}
+        {!network.isConnected && (
+          <View className="offline-banner">
+            <Text className="offline-banner-text">⚠️ 当前无网络连接</Text>
+          </View>
+        )}
         <LoadingState text="正在获取附近风险信息..." />
       </View>
     )
@@ -107,7 +156,11 @@ export default function IndexPage() {
   if (error) {
     return (
       <View className="container">
-        <ErrorState message={error} onRetry={fetchData} />
+        <ErrorState
+          title="加载失败"
+          message={error}
+          onRetry={fetchData}
+        />
       </View>
     )
   }
@@ -129,6 +182,22 @@ export default function IndexPage() {
   return (
     <ScrollView className="index-page" scrollY enableFlex>
       <View className="container">
+        {/* 离线横幅 */}
+        {!network.isConnected && (
+          <View className="offline-banner">
+            <Text className="offline-banner-text">⚠️ 当前无网络连接，显示缓存数据</Text>
+          </View>
+        )}
+
+        {/* 缓存时间标签 */}
+        {cacheTimestamp && (
+          <View className="cache-label">
+            <Text style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-hint)' }}>
+              缓存时间：{getCacheAge(cacheTimestamp)}
+            </Text>
+          </View>
+        )}
+
         {/* 位置信息 */}
         <View className="location-bar">
           <Text className="location-icon">📍</Text>
@@ -149,7 +218,7 @@ export default function IndexPage() {
             <VoiceButton text={`${riskData.areaName}，当前风险等级：${riskData.riskLabel}。${riskData.riskDescription}`} />
           </View>
           <DataFreshness
-            freshness={riskData.freshness as any}
+            freshness={riskData.freshness as 'fresh' | 'partial' | 'stale' | 'unknown'}
             updatedAt={riskData.updatedAt}
             source={riskData.source}
           />
@@ -200,7 +269,7 @@ export default function IndexPage() {
                 <View className="evidence-footer">
                   <Text className="evidence-source">
                     来源：{item.source}
-                    {item.verified ? '（已核验）' : '（待核验）'}
+                    {item.verified ? ' ✅（已核验）' : ' ⏳（待核验）'}
                   </Text>
                   <Text className="evidence-time">{formatTime(item.reportedAt)}</Text>
                 </View>

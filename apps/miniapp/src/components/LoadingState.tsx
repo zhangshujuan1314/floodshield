@@ -13,6 +13,7 @@ export default function LoadingState({ text = '加载中...' }: LoadingStateProp
         alignItems: 'center',
         justifyContent: 'center',
         padding: 'var(--spacing-xl) var(--spacing-lg)',
+        minHeight: '200px',
       }}
     >
       <View

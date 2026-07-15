@@ -8,7 +8,7 @@
 /* 地图区域 */
 .map-container {
   width: 100%;
-  height: 500px;
+  height: 400px;
   background: #e8e8e8;
   position: relative;
 }
@@ -21,7 +21,7 @@
 .map-placeholder,
 .map-unavailable {
   width: 100%;
-  height: 100%;
+  height: 200px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -31,8 +31,8 @@
 
 .map-placeholder-icon,
 .map-unavailable-icon {
-  font-size: 80px;
-  margin-bottom: var(--spacing-md);
+  font-size: 48px;
+  margin-bottom: var(--spacing-sm);
 }
 
 .map-placeholder-text,
@@ -73,6 +73,13 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
+  background: #f9f9f9;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+}
+
+.layer-toggle-icon {
+  font-size: var(--font-size-base);
 }
 
 .layer-toggle-label {
@@ -135,17 +142,41 @@
 /* 列表视图 fallback */
 .list-fallback {
   flex: 1;
-  padding: var(--spacing-md);
 }
 
-.list-fallback-title {
+/* 图层分组 */
+.layer-section {
+  margin-bottom: var(--spacing-md);
+}
+
+.layer-section-header {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-sm) 0;
+  margin-bottom: var(--spacing-sm);
+}
+
+.layer-section-icon {
+  font-size: var(--font-size-md);
+  margin-right: var(--spacing-xs);
+}
+
+.layer-section-title {
   font-size: var(--font-size-md);
   font-weight: 600;
   color: var(--color-text-primary);
-  margin-bottom: var(--spacing-md);
-  display: block;
+  flex: 1;
 }
 
+.layer-section-count {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-hint);
+  background: #f0f0f0;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
+/* 列表项 */
 .list-item {
   margin-bottom: var(--spacing-sm);
 }
@@ -155,13 +186,28 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--spacing-xs);
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
 }
 
 .list-item-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 2px solid;
+  flex-shrink: 0;
+}
+
+.list-item-badge-text {
   font-size: var(--font-size-xs);
   font-weight: 600;
-  margin-bottom: var(--spacing-xs);
-  display: block;
+  white-space: nowrap;
+}
+
+.list-item-source {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-hint);
 }
 
 .list-item-title {
@@ -169,22 +215,72 @@
   color: var(--color-text-primary);
   font-weight: 500;
   display: block;
+  margin-bottom: var(--spacing-xs);
 }
 
-.list-item-sub {
+.list-item-desc {
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
-  margin-top: var(--spacing-xs);
   display: block;
+  margin-bottom: var(--spacing-xs);
+  line-height: 1.5;
 }
 
-.list-item-detail {
+.list-item-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.list-item-area {
   font-size: var(--font-size-xs);
   color: var(--color-text-hint);
-  margin-top: var(--spacing-xs);
-  display: block;
 }
 
+.list-item-time {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-hint);
+}
+
+.list-item-coord {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-hint);
+}
+
+.list-item-distance {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.list-item-contact {
+  font-size: var(--font-size-xs);
+  color: var(--color-primary);
+}
+
+.list-item-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.list-item-meta-text {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.list-item-meta-tag {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  background: #f5f5f5;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* 状态徽章 */
 .status-badge {
   padding: 4px 12px;
   border-radius: 999px;

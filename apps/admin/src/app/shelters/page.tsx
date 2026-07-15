@@ -1,15 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
 import { fetchShelters, updateShelter } from '@/lib/api';
+import { hasPermission, getStoredUser } from '@/lib/auth';
 import DataTable, { Column } from '@/components/DataTable';
 import StatusBadge, { SHELTER_STATUS_MAP } from '@/components/StatusBadge';
-import ConfirmDialog from '@/components/ConfirmDialog';
-import type { Shelter, ShelterStatus } from '@/lib/types';
+import type { Shelter, ShelterStatus, User } from '@/lib/types';
 
 dayjs.extend(relativeTime);
 dayjs.locale('zh-cn');
@@ -26,16 +26,39 @@ export default function SheltersPage() {
     fetchShelters
   );
 
+  const [user, setUser] = useState<User | null>(null);
   const [editingShelter, setEditingShelter] = useState<Shelter | null>(null);
-  const [formData, setFormData] = useState<Partial<Shelter>>({});
+  const [formData, setFormData] = useState<{
+    status: ShelterStatus;
+    capacityEstimated: number;
+    accessibilityWheelchair: boolean;
+    accessibilityMedical: boolean;
+    contactName: string;
+    contactPhone: string;
+  }>({
+    status: 'open',
+    capacityEstimated: 0,
+    accessibilityWheelchair: false,
+    accessibilityMedical: false,
+    contactName: '',
+    contactPhone: '',
+  });
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const stored = getStoredUser();
+    if (stored) setUser(stored);
+  }, []);
+
+  const canEdit = user ? hasPermission(user.role, 'shelter:edit') : false;
 
   const handleEdit = (shelter: Shelter) => {
     setEditingShelter(shelter);
     setFormData({
-      capacity: shelter.capacity,
       status: shelter.status,
-      accessibility: shelter.accessibility,
+      capacityEstimated: shelter.capacity,
+      accessibilityWheelchair: shelter.accessibility,
+      accessibilityMedical: false,
       contactName: shelter.contactName,
       contactPhone: shelter.contactPhone,
     });
@@ -44,7 +67,18 @@ export default function SheltersPage() {
   const handleSave = async () => {
     if (!editingShelter) return;
     setSaving(true);
-    await updateShelter(editingShelter.id, formData);
+    await updateShelter(editingShelter.id, {
+      status: formData.status,
+      capacityEstimated: formData.capacityEstimated,
+      accessibilityJson: {
+        wheelchair: formData.accessibilityWheelchair,
+        medical: formData.accessibilityMedical,
+      },
+      contactJson: {
+        name: formData.contactName,
+        phone: formData.contactPhone,
+      },
+    });
     setSaving(false);
     setEditingShelter(null);
     mutate();
@@ -66,12 +100,24 @@ export default function SheltersPage() {
       key: 'status',
       title: '状态',
       width: '90px',
-      render: (val) => <StatusBadge status={val as string} statusMap={SHELTER_STATUS_MAP} />,
+      render: (val) => {
+        const statusLabels: Record<string, string> = {
+          open: '开放', full: '容量紧张', closed: '关闭', maintenance: '维护中',
+        };
+        return (
+          <div>
+            <StatusBadge status={val as string} statusMap={SHELTER_STATUS_MAP} />
+            <div className="text-hint" style={{ fontSize: 'var(--font-size-xs)', marginTop: 2 }}>
+              {statusLabels[val as string] || String(val)}
+            </div>
+          </div>
+        );
+      },
     },
     {
       key: 'currentOccupancy',
       title: '入住',
-      width: '100px',
+      width: '120px',
       sortable: true,
       render: (val, row) => {
         const occupancy = val as number;
@@ -79,10 +125,15 @@ export default function SheltersPage() {
         const color = pct >= 90 ? 'var(--color-danger)' : pct >= 70 ? 'var(--color-warning)' : 'var(--color-safe)';
         return (
           <div>
-            <span style={{ color, fontWeight: 600 }}>{occupancy}</span>
-            <span className="text-hint">/{row.capacity}</span>
-            <div style={{ background: '#f0f0f0', borderRadius: 4, height: 4, marginTop: 4 }}>
-              <div style={{ background: color, borderRadius: 4, height: 4, width: `${Math.min(pct, 100)}%` }} />
+            <div className="flex items-center justify-between">
+              <span style={{ color, fontWeight: 600 }}>{occupancy}</span>
+              <span className="text-hint">/{row.capacity}</span>
+            </div>
+            <div style={{ background: '#f0f0f0', borderRadius: 4, height: 6, marginTop: 4 }}>
+              <div style={{ background: color, borderRadius: 4, height: 6, width: `${Math.min(pct, 100)}%`, transition: 'width 0.3s' }} />
+            </div>
+            <div className="text-hint" style={{ fontSize: 'var(--font-size-xs)', marginTop: 2, textAlign: 'right' }}>
+              {pct}%
             </div>
           </div>
         );
@@ -92,7 +143,7 @@ export default function SheltersPage() {
       key: 'accessibility',
       title: '无障碍',
       width: '70px',
-      render: (val) => (val ? '✅ 是' : '❌ 否'),
+      render: (val) => (val ? '♿ 是' : '— 否'),
     },
     {
       key: 'verificationStatus',
@@ -113,24 +164,35 @@ export default function SheltersPage() {
     },
     {
       key: 'updatedAt',
-      title: '更新',
-      width: '80px',
-      render: (val) => (
-        <span className="text-hint" style={{ fontSize: 'var(--font-size-xs)' }}>
-          {dayjs(val as string).fromNow()}
-        </span>
-      ),
+      title: '最后更新',
+      width: '100px',
+      render: (val) => {
+        const updated = dayjs(val as string);
+        const isOld = dayjs().diff(updated, 'hour') > 24;
+        return (
+          <div>
+            <span className="text-hint" style={{ fontSize: 'var(--font-size-xs)' }}>
+              {updated.fromNow()}
+            </span>
+            {isOld && (
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-warning)', marginTop: 2 }}>
+                ⏰ 数据较旧
+              </div>
+            )}
+          </div>
+        );
+      },
     },
-    {
-      key: 'id',
+    ...(canEdit ? [{
+      key: 'id' as string,
       title: '操作',
       width: '60px',
-      render: (_val, row) => (
+      render: (_val: unknown, row: Shelter) => (
         <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); handleEdit(row); }}>
           编辑
         </button>
       ),
-    },
+    }] : []),
   ];
 
   return (
@@ -141,6 +203,8 @@ export default function SheltersPage() {
         <div className="empty-state"><div className="empty-state-icon">⏳</div><div className="empty-state-text">加载中...</div></div>
       ) : error ? (
         <div className="empty-state"><div className="empty-state-icon">❌</div><div className="empty-state-text">加载失败</div></div>
+      ) : (shelters || []).length === 0 ? (
+        <div className="empty-state"><div className="empty-state-icon">🏠</div><div className="empty-state-text">暂无避险场所</div></div>
       ) : (
         <DataTable
           columns={columns}
@@ -160,12 +224,12 @@ export default function SheltersPage() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">容纳人数</label>
+              <label className="form-label">预估容纳人数</label>
               <input
                 type="number"
                 className="form-input"
-                value={formData.capacity || 0}
-                onChange={e => setFormData(prev => ({ ...prev, capacity: Number(e.target.value) }))}
+                value={formData.capacityEstimated || 0}
+                onChange={e => setFormData(prev => ({ ...prev, capacityEstimated: Number(e.target.value) }))}
               />
             </div>
 
@@ -173,26 +237,38 @@ export default function SheltersPage() {
               <label className="form-label">状态</label>
               <select
                 className="form-select"
-                value={formData.status || 'open'}
+                value={formData.status}
                 onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as ShelterStatus }))}
               >
-                <option value="open">开放</option>
-                <option value="full">满员</option>
-                <option value="closed">关闭</option>
-                <option value="maintenance">维护中</option>
+                <option value="open">🟢 开放</option>
+                <option value="full">🟡 满员</option>
+                <option value="closed">⚪ 关闭</option>
+                <option value="maintenance">🔧 维护中</option>
               </select>
             </div>
 
             <div className="form-group">
-              <label className="form-label">
-                <input
-                  type="checkbox"
-                  checked={formData.accessibility || false}
-                  onChange={e => setFormData(prev => ({ ...prev, accessibility: e.target.checked }))}
-                  style={{ marginRight: 8 }}
-                />
-                无障碍设施
-              </label>
+              <label className="form-label">无障碍设施</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.accessibilityWheelchair}
+                    onChange={e => setFormData(prev => ({ ...prev, accessibilityWheelchair: e.target.checked }))}
+                    style={{ width: 16, height: 16, accentColor: 'var(--color-primary)' }}
+                  />
+                  <span style={{ fontSize: 'var(--font-size-sm)' }}>♿ 轮椅无障碍通道</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.accessibilityMedical}
+                    onChange={e => setFormData(prev => ({ ...prev, accessibilityMedical: e.target.checked }))}
+                    style={{ width: 16, height: 16, accentColor: 'var(--color-primary)' }}
+                  />
+                  <span style={{ fontSize: 'var(--font-size-sm)' }}>🏥 医疗支持</span>
+                </label>
+              </div>
             </div>
 
             <div className="form-row">
@@ -201,7 +277,7 @@ export default function SheltersPage() {
                 <input
                   type="text"
                   className="form-input"
-                  value={formData.contactName || ''}
+                  value={formData.contactName}
                   onChange={e => setFormData(prev => ({ ...prev, contactName: e.target.value }))}
                 />
               </div>
@@ -210,7 +286,7 @@ export default function SheltersPage() {
                 <input
                   type="text"
                   className="form-input"
-                  value={formData.contactPhone || ''}
+                  value={formData.contactPhone}
                   onChange={e => setFormData(prev => ({ ...prev, contactPhone: e.target.value }))}
                 />
               </div>

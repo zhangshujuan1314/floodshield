@@ -1,22 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
-import { fetchDashboard } from '@/lib/api';
+import { fetchRiskOverview } from '@/lib/api';
 import RiskBadge from '@/components/RiskBadge';
 import DataFreshness from '@/components/DataFreshness';
-import type { DashboardSummary } from '@/lib/types';
+import type { RiskOverview } from '@/lib/types';
 
 dayjs.extend(relativeTime);
 dayjs.locale('zh-cn');
 
 export default function DashboardPage() {
-  const { data, error, isLoading } = useSWR<DashboardSummary>(
-    'dashboard',
-    fetchDashboard,
+  const { data, error, isLoading } = useSWR<RiskOverview>(
+    'risk-overview',
+    fetchRiskOverview,
     { refreshInterval: 30000 }
   );
 
@@ -143,21 +142,25 @@ export default function DashboardPage() {
       {/* 最近报告 */}
       <div className="card mb-md">
         <div className="card-title">最近报告</div>
-        {data.recentReports.map(report => (
-          <div key={report.id} style={{
-            padding: 'var(--spacing-sm) 0',
-            borderBottom: '1px solid var(--color-border-light)',
-            cursor: 'pointer',
-          }} onClick={() => window.location.href = `/reports/${report.id}`}>
-            <div className="flex items-center justify-between">
-              <span className="font-bold">{report.title}</span>
-              <RiskBadge level={report.riskLevel} size="sm" />
+        {data.recentReports.length === 0 ? (
+          <div className="text-hint">暂无最近报告</div>
+        ) : (
+          data.recentReports.map(report => (
+            <div key={report.id} style={{
+              padding: 'var(--spacing-sm) 0',
+              borderBottom: '1px solid var(--color-border-light)',
+              cursor: 'pointer',
+            }} onClick={() => window.location.href = `/reports/${report.id}`}>
+              <div className="flex items-center justify-between">
+                <span className="font-bold">{report.title}</span>
+                <RiskBadge level={report.riskLevel} size="sm" />
+              </div>
+              <div className="text-hint" style={{ fontSize: 'var(--font-size-xs)', marginTop: 4 }}>
+                {report.reporterName} · {report.location.address} · {dayjs(report.createdAt).fromNow()}
+              </div>
             </div>
-            <div className="text-hint" style={{ fontSize: 'var(--font-size-xs)', marginTop: 4 }}>
-              {report.reporterName} · {report.location.address} · {dayjs(report.createdAt).fromNow()}
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       {/* 数据新鲜度 */}

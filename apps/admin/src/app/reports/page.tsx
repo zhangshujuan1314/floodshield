@@ -1,16 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
 import { fetchReports, verifyReport, rejectReport } from '@/lib/api';
+import { hasPermission, getStoredUser } from '@/lib/auth';
 import DataTable, { Column } from '@/components/DataTable';
 import RiskBadge from '@/components/RiskBadge';
 import StatusBadge, { REPORT_STATUS_MAP, REPORT_TYPE_MAP } from '@/components/StatusBadge';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import type { Report, ReportStatus, PaginatedData } from '@/lib/types';
+import type { Report, ReportStatus, PaginatedData, User } from '@/lib/types';
 
 dayjs.extend(relativeTime);
 dayjs.locale('zh-cn');
@@ -24,6 +26,7 @@ const STATUS_FILTERS: { key: ReportStatus | 'all'; label: string }[] = [
 ];
 
 export default function ReportsPage() {
+  const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<ReportStatus | 'all'>('pending_review');
   const [page, setPage] = useState(1);
   const [confirmAction, setConfirmAction] = useState<{
@@ -32,6 +35,15 @@ export default function ReportsPage() {
     reportTitle: string;
   } | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const stored = getStoredUser();
+    if (stored) setUser(stored);
+  }, []);
+
+  const canVerify = user ? hasPermission(user.role, 'report:verify') : false;
+  const canReject = user ? hasPermission(user.role, 'report:reject') : false;
 
   const { data, error, isLoading, mutate } = useSWR<PaginatedData<Report>>(
     ['reports', statusFilter, page],
@@ -60,9 +72,43 @@ export default function ReportsPage() {
 
   const columns: Column<Report>[] = [
     {
+      key: 'id',
+      title: 'ID',
+      width: '90px',
+      render: (val) => (
+        <span style={{ fontFamily: 'monospace', fontSize: 'var(--font-size-xs)' }}>
+          {String(val).slice(0, 10)}
+        </span>
+      ),
+    },
+    {
+      key: 'type',
+      title: '类型',
+      width: '80px',
+      render: (val) => {
+        const cfg = REPORT_TYPE_MAP[val as string] || { label: String(val), icon: '📌' };
+        return <span>{cfg.icon} {cfg.label}</span>;
+      },
+    },
+    {
+      key: 'location',
+      title: '位置',
+      render: (val) => {
+        const loc = val as Report['location'];
+        return <span className="text-secondary">{loc.address}</span>;
+      },
+    },
+    {
+      key: 'status',
+      title: '状态',
+      width: '90px',
+      sortable: true,
+      render: (val) => <StatusBadge status={val as string} statusMap={REPORT_STATUS_MAP} />,
+    },
+    {
       key: 'priority',
       title: '优先级',
-      width: '60px',
+      width: '70px',
       sortable: true,
       render: (val) => {
         const v = val as number;
@@ -76,58 +122,9 @@ export default function ReportsPage() {
       },
     },
     {
-      key: 'title',
-      title: '标题',
-      sortable: true,
-      render: (val, row) => (
-        <div>
-          <div className="font-bold">{String(val)}</div>
-          <div className="text-hint" style={{ fontSize: 'var(--font-size-xs)' }}>
-            {(REPORT_TYPE_MAP[row.type] as { label: string })?.label || row.type}
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'riskLevel',
-      title: '风险',
-      width: '80px',
-      render: (val) => <RiskBadge level={val as 'normal' | 'attention' | 'high' | 'critical'} size="sm" />,
-    },
-    {
-      key: 'status',
-      title: '状态',
-      width: '90px',
-      render: (val) => <StatusBadge status={val as string} statusMap={REPORT_STATUS_MAP} />,
-    },
-    {
-      key: 'reporterName',
-      title: '报告人',
-      width: '80px',
-    },
-    {
-      key: 'location',
-      title: '位置',
-      render: (val) => {
-        const loc = val as Report['location'];
-        return <span className="text-secondary">{loc.address}</span>;
-      },
-    },
-    {
-      key: 'credibilityScore',
-      title: '可信度',
-      width: '70px',
-      sortable: true,
-      render: (val) => {
-        const score = val as number;
-        const color = score >= 0.8 ? 'var(--color-safe)' : score >= 0.5 ? 'var(--color-warning)' : 'var(--color-danger)';
-        return <span style={{ color, fontWeight: 600 }}>{Math.round(score * 100)}%</span>;
-      },
-    },
-    {
       key: 'createdAt',
-      title: '时间',
-      width: '90px',
+      title: '提交时间',
+      width: '110px',
       sortable: true,
       render: (val) => (
         <span className="text-hint" style={{ fontSize: 'var(--font-size-xs)' }}>
@@ -138,33 +135,36 @@ export default function ReportsPage() {
     {
       key: 'id',
       title: '操作',
-      width: '140px',
+      width: '180px',
       render: (_val, row) => (
         <div className="flex gap-sm">
-          <a href={`/reports/${row.id}`} className="btn btn-secondary btn-sm">
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={(e) => { e.stopPropagation(); router.push(`/reports/${row.id}`); }}
+          >
             详情
-          </a>
-          {row.status === 'pending_review' && (
-            <>
-              <button
-                className="btn btn-success btn-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setConfirmAction({ type: 'verify', reportId: row.id, reportTitle: row.title });
-                }}
-              >
-                核验
-              </button>
-              <button
-                className="btn btn-danger btn-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setConfirmAction({ type: 'reject', reportId: row.id, reportTitle: row.title });
-                }}
-              >
-                驳回
-              </button>
-            </>
+          </button>
+          {row.status === 'pending_review' && canVerify && (
+            <button
+              className="btn btn-success btn-sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setConfirmAction({ type: 'verify', reportId: row.id, reportTitle: row.title });
+              }}
+            >
+              核验
+            </button>
+          )}
+          {row.status === 'pending_review' && canReject && (
+            <button
+              className="btn btn-danger btn-sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setConfirmAction({ type: 'reject', reportId: row.id, reportTitle: row.title });
+              }}
+            >
+              驳回
+            </button>
           )}
         </div>
       ),
@@ -193,14 +193,43 @@ export default function ReportsPage() {
         <div className="empty-state"><div className="empty-state-icon">⏳</div><div className="empty-state-text">加载中...</div></div>
       ) : error ? (
         <div className="empty-state"><div className="empty-state-icon">❌</div><div className="empty-state-text">加载失败</div></div>
+      ) : (data?.items || []).length === 0 ? (
+        <div className="empty-state"><div className="empty-state-icon">📋</div><div className="empty-state-text">暂无报告</div></div>
       ) : (
-        <DataTable
-          columns={columns}
-          data={data?.items || []}
-          rowKey="id"
-          pageSize={10}
-          emptyText="暂无报告"
-        />
+        <>
+          <DataTable
+            columns={columns}
+            data={data?.items || []}
+            rowKey="id"
+            pageSize={10}
+            emptyText="暂无报告"
+            onRowClick={(row) => router.push(`/reports/${row.id}`)}
+          />
+          {/* 服务端分页 */}
+          {data && data.totalPages > 1 && (
+            <div className="flex items-center justify-between mt-md">
+              <span className="text-hint" style={{ fontSize: 'var(--font-size-sm)' }}>
+                共 {data.total} 条，第 {data.page}/{data.totalPages} 页
+              </span>
+              <div className="flex gap-sm">
+                <button
+                  className="pagination-btn"
+                  disabled={page <= 1}
+                  onClick={() => setPage(p => p - 1)}
+                >
+                  上一页
+                </button>
+                <button
+                  className="pagination-btn"
+                  disabled={page >= data.totalPages}
+                  onClick={() => setPage(p => p + 1)}
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* 核验确认对话框 */}

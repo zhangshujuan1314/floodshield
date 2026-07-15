@@ -2,7 +2,32 @@
 
 AI 洪涝预警与避险平台
 
+> 官方预警 → 风险计算 → 居民查看 → 上报 → 社区核验 → 路线更新 → 通知闭环
+
 汛安把官方气象与应急信息、局地雨情、积水上报、道路状态和避险场所数据，转化为居民能立即执行的社区级风险提示、证据化路线建议和基层处置闭环。
+
+## 当前进度
+
+| 阶段 | 状态 | 说明 |
+|------|------|------|
+| Phase 0 | ✅ 完成 | 仓库骨架、Docker Compose、mock 模式 |
+| Phase 1 | ✅ 完成 | 领域模型、PostGIS 迁移、风险引擎、67 个测试 |
+| Phase 2 | 🔄 进行中 | 居民端闭环、管理后台完善 |
+| Phase 3 | ⏳ 待开始 | 社区/应急后台 |
+| Phase 4 | ⏳ 待开始 | 真实数据适配器 |
+| Phase 5 | ⏳ 待开始 | AI 和语音 |
+| Phase 6 | ⏳ 待开始 | 演练和加固 |
+
+### 项目统计
+
+| 指标 | 数值 |
+|------|------|
+| 源文件 | 150+ |
+| 后端端点 | 31 个 |
+| 测试用例 | 67 个（全部通过） |
+| 数据库表 | 14 张（PostGIS） |
+| 前端页面 | 14 个（居民 6 + 后台 8） |
+| 组件 | 16 个 |
 
 ## 架构概览
 
@@ -145,14 +170,17 @@ floodshield/
 **居民端**
 
 ```
-GET  /v1/areas/resolve?lat=&lng=
-GET  /v1/nearby/summary?areaId=&lat=&lng=
-GET  /v1/alerts?areaId=&active=true
-GET  /v1/map/layers?areaId=&types=
-GET  /v1/shelters/nearby?lat=&lng=&accessibility=
-POST /v1/hazard-reports
-POST /v1/routes/evacuation
-POST /v1/voice/announcement
+GET  /v1/health                    # 健康检查
+GET  /v1/alerts                    # 官方预警列表
+GET  /v1/nearby/summary?areaId=&lat=&lon=  # 附近风险摘要
+GET  /v1/map/layers?areaId=&types=         # 地图图层
+GET  /v1/shelters/nearby?lat=&lon=         # 附近避险场所
+POST /v1/hazard-reports            # 提交隐患报告
+GET  /v1/hazard-reports/{id}       # 查询报告
+POST /v1/routes/evacuation         # 避险路线规划
+GET  /v1/routes/{id}               # 查询路线
+POST /v1/notifications/subscriptions  # 订阅通知
+POST /v1/voice/announcement        # 语音播报
 ```
 
 **管理后台**
@@ -178,27 +206,31 @@ POST /internal/risk/recompute
 ## 测试
 
 ```bash
-# 后端测试
+# 后端测试（67 个测试，全部通过）
 cd services/api
-pytest
+pytest -v
 
 # 带覆盖率
 pytest --cov=app --cov-report=html
-
-# 前端测试（管理后台）
-cd apps/admin
-npm test
-
-# 前端测试（居民端）
-cd apps/miniapp
-npm test
 ```
 
-测试分类：
+### 测试套件
 
-- `tests/unit/` — 单元测试（风险计算、数据校验、权限）
-- `tests/integration/` — 集成测试（API 接口、数据库交互）
-- `tests/e2e/` — 端到端测试（完整业务流程）
+| 套件 | 数量 | 覆盖 |
+|------|------|------|
+| API 集成 | 25 | 所有端点、错误格式、请求 ID |
+| 风险引擎 | 16 | 正常/过期/缺失/冲突/越界/未知/回放 |
+| 通知安全 | 13 | 幂等性/状态生命周期/渠道/批量 |
+| 路线安全 | 10 | 3 种场景/几何/安全字段 |
+| 健康检查 | 3 | 请求 ID 传播 |
+
+### 安全关键测试
+
+- `test_all_missing_returns_unknown_risk_level` — 缺失数据 ≠ 安全
+- `test_same_idempotency_key_returns_same_delivery` — 通知幂等
+- `test_no_route_means_no_fake_route` — 无路线时不伪造
+- `test_report_location_fuzzing` — 坐标模糊化至 ~100m
+- `test_error_no_traceback` — 错误不暴露堆栈
 
 详见 [docs/test-matrix.md](docs/test-matrix.md)。
 

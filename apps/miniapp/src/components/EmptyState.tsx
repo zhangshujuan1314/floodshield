@@ -23,15 +23,16 @@ export default function EmptyState({
         alignItems: 'center',
         justifyContent: 'center',
         padding: 'var(--spacing-xl) var(--spacing-lg)',
+        minHeight: '240px',
       }}
     >
-      <Text style={{ fontSize: '80px', marginBottom: 'var(--spacing-lg)' }}>{icon}</Text>
+      <Text style={{ fontSize: '64px', marginBottom: 'var(--spacing-md)' }}>{icon}</Text>
       <Text
         style={{
           fontSize: 'var(--font-size-md)',
           color: 'var(--color-text-primary)',
           fontWeight: '500',
-          marginBottom: 'var(--spacing-sm)',
+          marginBottom: 'var(--spacing-xs)',
         }}
       >
         {title}
@@ -42,7 +43,8 @@ export default function EmptyState({
             fontSize: 'var(--font-size-sm)',
             color: 'var(--color-text-hint)',
             textAlign: 'center',
-            lineHeight: '1.5',
+            lineHeight: '1.6',
+            maxWidth: '480px',
           }}
         >
           {description}
