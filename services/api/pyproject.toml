@@ -18,6 +18,7 @@ dependencies = [
     "pydantic-settings",
     "python-dotenv",
     "httpx",
+    "pyjwt[crypto]>=2.8",
 ]
 
 [project.optional-dependencies]

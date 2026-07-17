@@ -33,6 +33,12 @@ class NotFound(AppError):
     message = "The requested resource was not found."
 
 
+class Unauthorized(AppError):
+    status_code = 401
+    code = "UNAUTHORIZED"
+    message = "Authentication required."
+
+
 class Forbidden(AppError):
     status_code = 403
     code = "FORBIDDEN"

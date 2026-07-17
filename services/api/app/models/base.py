@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,6 +12,12 @@ from app.core.database import Base, TimestampMixin
 
 class User(TimestampMixin, Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('admin', 'operator', 'community', 'emergency', 'viewer')",
+            name="ck_user_role_valid",
+        ),
+    )
 
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
@@ -71,12 +77,23 @@ class Observation(TimestampMixin, Base):
 
 class RiskSnapshot(TimestampMixin, Base):
     __tablename__ = "risk_snapshots"
+    __table_args__ = (
+        CheckConstraint(
+            "risk_level IN ('normal', 'attention', 'high', 'critical', 'unknown')",
+            name="ck_risk_level_valid",
+        ),
+        CheckConstraint(
+            "risk_score >= -1.0 AND risk_score <= 1.0",
+            name="ck_risk_score_range",
+        ),
+    )
 
     area_id: Mapped[str] = mapped_column(String(64), nullable=False)
     risk_level: Mapped[str] = mapped_column(String(16), nullable=False)
     risk_score: Mapped[float] = mapped_column(Float, nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     evidence: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    rule_version: Mapped[str] = mapped_column(String(32), default="v1.0")
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
@@ -89,7 +106,8 @@ class HazardReport(TimestampMixin, Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     location_geojson: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    status: Mapped[str] = mapped_column(String(32), default="pending")
+    status: Mapped[str] = mapped_column(String(32), default="pending_review")
+    location_fuzzed_geojson: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     verified_by: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -110,6 +128,10 @@ class RoadEvent(TimestampMixin, Base):
 
 class Shelter(TimestampMixin, Base):
     __tablename__ = "shelters"
+    __table_args__ = (
+        CheckConstraint("current_occupancy >= 0", name="ck_shelter_occupancy_non_negative"),
+        CheckConstraint("current_occupancy <= capacity", name="ck_shelter_occupancy_within_capacity"),
+    )
 
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     address: Mapped[str] = mapped_column(String(512), nullable=False)
@@ -155,6 +177,15 @@ class NotificationDelivery(TimestampMixin, Base):
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class NotificationSubscription(TimestampMixin, Base):
+    __tablename__ = "notification_subscriptions"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
+    area_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    channel: Mapped[str] = mapped_column(String(32), default="push")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class Task(TimestampMixin, Base):

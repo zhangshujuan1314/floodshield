@@ -20,10 +20,10 @@ async def list_map_layers(request: Request):
             "description": "Current flood risk zones by area",
             "style": {
                 "fillColors": {
-                    "low": "#4CAF50",
-                    "medium": "#FF9800",
+                    "normal": "#4CAF50",
+                    "attention": "#FF9800",
                     "high": "#F44336",
-                    "extreme": "#9C27B0",
+                    "critical": "#9C27B0",
                 },
                 "opacity": 0.4,
             },

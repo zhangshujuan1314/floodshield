@@ -51,7 +51,7 @@ async def risk_overview(
             "areas": area_risks,
             "summary": {
                 "totalAreas": len(area_risks),
-                "highRiskAreas": sum(1 for a in area_risks if a["riskLevel"] in ("high", "extreme")),
+                "highRiskAreas": sum(1 for a in area_risks if a["riskLevel"] in ("high", "critical")),
                 "activeAlerts": 3,
                 "pendingReports": 12,
                 "openTasks": 5,

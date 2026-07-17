@@ -24,7 +24,7 @@ class TestNormalInputs:
             "drainage_capacity": SignalInput(value=0.9, observed_at=now - timedelta(hours=1)),
         }
         result = compute_risk(signals, now=now)
-        assert result.risk_level == "low"
+        assert result.risk_level == "normal"
         assert result.risk_score < 0.3
         assert result.confidence == 1.0
         assert result.data_status == "normal"
@@ -40,7 +40,7 @@ class TestNormalInputs:
             "drainage_capacity": SignalInput(value=0.2, observed_at=now - timedelta(hours=1)),
         }
         result = compute_risk(signals, now=now)
-        assert result.risk_level in ("high", "extreme")
+        assert result.risk_level in ("high", "critical")
         assert result.risk_score >= 0.6
         assert result.confidence == 1.0
         assert result.data_status == "normal"
@@ -97,7 +97,7 @@ class TestMissingInputs:
         now = _now()
         result = compute_risk({}, now=now)
         assert result.data_status == "degraded"
-        assert result.risk_score == 0.0
+        assert result.risk_score == -1.0
         assert result.confidence == 0.0
         assert all(s.data_status == "unknown" for s in result.signals)
 
@@ -175,23 +175,23 @@ class TestOutOfRangeInputs:
 
 class TestUnknownRiskLevel:
     """Critical safety test: when ALL signals are missing, risk_level must be 'unknown',
-    NOT 'low' or 'normal'. Missing data must NEVER be interpreted as safe."""
+    NOT 'normal'. Missing data must NEVER be interpreted as safe."""
 
     def test_all_missing_returns_unknown_risk_level(self):
         """The most dangerous antipattern: no data = green/safe."""
         now = _now()
         result = compute_risk({}, now=now)
         assert result.risk_level == "unknown"
-        assert result.risk_score == 0.0
+        assert result.risk_score == -1.0
         assert result.confidence == 0.0
         assert result.data_status == "degraded"
 
     def test_unknown_is_not_low(self):
-        """Ensure 'unknown' is distinct from 'low' — they must not be confused."""
+        """Ensure 'unknown' is distinct from 'normal' — they must not be confused."""
         now = _now()
         # All missing → unknown
         unknown_result = compute_risk({}, now=now)
-        # All normal low → low
+        # All normal low → normal
         low_result = compute_risk({
             "rainfall_mm": SignalInput(value=1.0, observed_at=now - timedelta(minutes=5)),
             "water_level_m": SignalInput(value=0.3, observed_at=now - timedelta(minutes=5)),
@@ -200,7 +200,7 @@ class TestUnknownRiskLevel:
             "drainage_capacity": SignalInput(value=0.95, observed_at=now - timedelta(minutes=5)),
         }, now=now)
         assert unknown_result.risk_level == "unknown"
-        assert low_result.risk_level == "low"
+        assert low_result.risk_level == "normal"
         assert unknown_result.risk_level != low_result.risk_level
 
     def test_partial_missing_not_unknown(self):
@@ -212,7 +212,7 @@ class TestUnknownRiskLevel:
         }
         result = compute_risk(signals, now=now)
         assert result.risk_level != "unknown"
-        assert result.risk_level in ("low", "medium", "high", "extreme")
+        assert result.risk_level in ("normal", "attention", "high", "critical")
 
 
 class TestRuleVersionReplay:
@@ -239,7 +239,7 @@ class TestRuleVersionReplay:
     def test_boundary_values(self):
         """Test exact threshold boundaries."""
         now = _now()
-        # Exactly at "medium" threshold for rainfall (30mm)
+        # Exactly at "attention" threshold for rainfall (30mm)
         signals = {
             "rainfall_mm": SignalInput(value=30.0, observed_at=now - timedelta(minutes=10)),
             "water_level_m": SignalInput(value=0.5, observed_at=now - timedelta(minutes=5)),
@@ -248,6 +248,6 @@ class TestRuleVersionReplay:
             "drainage_capacity": SignalInput(value=0.9, observed_at=now - timedelta(minutes=5)),
         }
         result = compute_risk(signals, now=now)
-        # At threshold, should be at least "medium" level contribution
+        # At threshold, should be at least "attention" level contribution
         rainfall_signal = next(s for s in result.signals if s.signal == "rainfall_mm")
         assert rainfall_signal.sub_score >= 0.5  # medium threshold

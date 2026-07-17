@@ -75,8 +75,8 @@ class SignalResult:
 
 @dataclass
 class RiskResult:
-    risk_score: float  # 0.0 .. 1.0
-    risk_level: str    # "low" | "medium" | "high" | "extreme"
+    risk_score: float  # -1.0 (no data) or 0.0 .. 1.0
+    risk_level: str    # "normal" | "attention" | "high" | "critical" | "unknown"
     confidence: float  # 0.0 .. 1.0
     data_status: str   # "normal" if all signals ok, else "degraded"
     signals: list[SignalResult] = field(default_factory=list)
@@ -224,10 +224,13 @@ def compute_risk(
         risk_score = weighted_sum / available_weight
     else:
         # ALL signals missing — must NOT default to safe/green
-        risk_score = 0.0
+        risk_score = -1.0  # Sentinel: indicates no data, NOT safe
         degraded = True
 
-    risk_score = round(min(max(risk_score, 0.0), 1.0), 4)
+    if risk_score >= 0:
+        risk_score = round(min(max(risk_score, 0.0), 1.0), 4)
+    else:
+        risk_score = -1.0  # Keep sentinel
 
     # Confidence: fraction of weight backed by fresh, in-range data
     confidence = round(available_weight / total_weight, 4) if total_weight > 0 else 0.0
@@ -243,13 +246,13 @@ def compute_risk(
     if available_weight == 0:
         risk_level = "unknown"
     elif risk_score >= 0.8:
-        risk_level = "extreme"
+        risk_level = "critical"
     elif risk_score >= 0.6:
         risk_level = "high"
     elif risk_score >= 0.3:
-        risk_level = "medium"
+        risk_level = "attention"
     else:
-        risk_level = "low"
+        risk_level = "normal"
 
     return RiskResult(
         risk_score=risk_score,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
@@ -12,12 +13,16 @@ from app.core.database import engine
 from app.core.errors import AppError, app_error_handler, generic_error_handler
 from app.middleware.request_id import RequestIDMiddleware
 
+logger = logging.getLogger(__name__)
+
 TZ_SHANGHAI = timezone(timedelta(hours=8))
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    if settings.MOCK_MODE:
+        logger.warning("⚠️  MOCK_MODE is enabled — authentication is bypassed. Do NOT use in production.")
     yield
     # Shutdown
     await engine.dispose()

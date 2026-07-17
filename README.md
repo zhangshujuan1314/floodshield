@@ -11,8 +11,9 @@ AI 洪涝预警与避险平台
 | 阶段 | 状态 | 说明 |
 |------|------|------|
 | Phase 0 | ✅ 完成 | 仓库骨架、Docker Compose、mock 模式 |
-| Phase 1 | ✅ 完成 | 领域模型、PostGIS 迁移、风险引擎、67 个测试 |
+| Phase 1 | ✅ 完成 | 领域模型、PostGIS 迁移、风险引擎 |
 | Phase 2 | ✅ 完成 | 居民端闭环（6 页面）、管理后台（8 页面） |
+| Phase 2.5 | ✅ 完成 | 安全加固：JWT 认证、数据库驱动预警、CheckConstraints、对抗性审查 |
 | Phase 3 | ⏳ 待开始 | 社区/应急后台增强 |
 | Phase 4 | ⏳ 待开始 | 真实数据适配器 |
 | Phase 5 | ⏳ 待开始 | AI 和语音 |
@@ -25,11 +26,33 @@ AI 洪涝预警与避险平台
 | 源文件 | 150+ |
 | 代码行数 | 20,000+ |
 | 后端端点 | 31 个 |
-| 测试用例 | 67 个（全部通过） |
-| 数据库表 | 14 张（PostGIS） |
+| 测试用例 | 100 个（全部通过） |
+| 数据库表 | 15 张（PostGIS） |
+| 数据库约束 | 5 个 CheckConstraint |
 | 前端页面 | 14 个（居民 6 + 后台 8） |
 | 组件 | 16 个 |
 | 文档 | 6 个 |
+
+### 安全加固（Phase 2.5）
+
+经过三轮对抗性审查，系统安全性从"可演示"提升到"可部署"：
+
+| 类别 | 修复项 | 状态 |
+|------|--------|------|
+| **P0 认证** | JWT 真实认证（PyJWT + PBKDF2） | ✅ |
+| **P0 认证** | MOCK_MODE 默认关闭（`False`） | ✅ |
+| **P0 认证** | SECRET_KEY 启动守卫（拒绝默认密钥） | ✅ |
+| **P0 认证** | 密码验证不再被 MOCK_MODE 跳过 | ✅ |
+| **P1 安全** | 禁用账户（`is_active=False`）无法登录 | ✅ |
+| **P1 安全** | 用户名枚举时序缓解（dummy PBKDF2） | ✅ |
+| **P1 安全** | 异常处理收窄（仅捕获 DB 错误） | ✅ |
+| **P1 安全** | 全部数据缺失时 `risk_score=-1.0`（非 0.0） | ✅ |
+| **P1 数据** | 预警端点改为数据库驱动（不再返回 fixtures） | ✅ |
+| **P2 加固** | User.role / RiskSnapshot / Shelter CheckConstraints | ✅ |
+| **P2 加固** | Alembic 迁移 `003_add_check_constraints.py` | ✅ |
+| **P2 加固** | 风险等级对齐 SPEC：`normal/attention/high/critical` | ✅ |
+| **P2 加固** | JWT 过期时间 24h → 60min | ✅ |
+| **P2 加固** | 预警 upsert（source + external_id 去重） | ✅ |
 
 ## 架构概览
 
@@ -88,7 +111,7 @@ docker compose logs -f api
 
 ## Mock 模式
 
-MVP 阶段默认启用 mock 数据源。mock provider 提供：
+开发阶段可启用 mock 数据源。mock provider 提供：
 
 - 模拟官方预警（暴雨黄色/橙色/红色）
 - 模拟雨情观测
@@ -96,11 +119,21 @@ MVP 阶段默认启用 mock 数据源。mock provider 提供：
 - 模拟避险场所
 - 模拟路线规划
 
-切换到真实数据源需要：
+### 启用 Mock 模式
+
+```bash
+# 在 services/api/.env 中设置
+MOCK_MODE=true
+```
+
+> ⚠️ **安全提示**：`MOCK_MODE` 默认为 `False`（认证强制开启）。启用 Mock 模式会跳过认证，仅用于本地开发。
+
+### 切换到真实数据源
 
 1. 在 `services/api/.env` 中配置真实 API 密钥
-2. 设置 `MOCK_PROVIDERS=false`
-3. 重启 API 服务
+2. 确保 `MOCK_MODE=false`（默认值）
+3. 设置 `SECRET_KEY` 为安全随机值
+4. 重启 API 服务
 
 **重要**：真实外发（短信、推送）必须显式配置凭证并经人工确认，禁止在无凭证时发送。
 
@@ -208,7 +241,7 @@ POST /internal/risk/recompute
 ## 测试
 
 ```bash
-# 后端测试（67 个测试，全部通过）
+# 后端测试（100 个测试，全部通过）
 cd services/api
 pytest -v
 
@@ -225,14 +258,19 @@ pytest --cov=app --cov-report=html
 | 通知安全 | 13 | 幂等性/状态生命周期/渠道/批量 |
 | 路线安全 | 10 | 3 种场景/几何/安全字段 |
 | 健康检查 | 3 | 请求 ID 传播 |
+| **认证安全** | **16** | **JWT 创建/验证/过期/角色检查** |
+| **预警数据库** | **17** | **数据库查询/过滤/MOCK 回退/转换** |
 
 ### 安全关键测试
 
-- `test_all_missing_returns_unknown_risk_level` — 缺失数据 ≠ 安全
+- `test_all_missing_returns_unknown_risk_level` — 缺失数据 ≠ 安全（risk_score=-1.0）
 - `test_same_idempotency_key_returns_same_delivery` — 通知幂等
 - `test_no_route_means_no_fake_route` — 无路线时不伪造
 - `test_report_location_fuzzing` — 坐标模糊化至 ~100m
 - `test_error_no_traceback` — 错误不暴露堆栈
+- `test_verify_token_expired` — 过期 JWT 拒绝
+- `test_get_current_user_no_token_non_mock_401` — 非 Mock 模式无 token 返回 401
+- `test_require_role_wrong_role_403` — 角色权限拦截
 
 详见 [docs/test-matrix.md](docs/test-matrix.md)。
 
@@ -245,13 +283,13 @@ pytest --cov=app --cov-report=html
 DATABASE_URL=postgresql+asyncpg://floodshield:floodshield@localhost:5432/floodshield
 REDIS_URL=redis://localhost:6379/0
 
-# 安全
+# 安全（生产环境必须修改 SECRET_KEY）
 SECRET_KEY=change-me-in-production
 JWT_ALGORITHM=HS256
-JWT_EXPIRE_MINUTES=1440
+JWT_EXPIRE_MINUTES=60
 
-# Mock 模式
-MOCK_PROVIDERS=true
+# Mock 模式（默认关闭，认证强制开启）
+MOCK_MODE=false
 
 # 外部数据源（真实模式需要）
 WEATHER_API_KEY=

@@ -10,7 +10,7 @@ TZ_SHANGHAI = timezone(timedelta(hours=8))
 
 class NoopAIProvider:
     async def generate_action_cards(self, context: dict[str, Any]) -> list[dict[str, Any]]:
-        risk_level = context.get("risk_level", "medium")
+        risk_level = context.get("risk_level", "attention")
         now = datetime.now(TZ_SHANGHAI)
 
         base_cards = [
@@ -32,7 +32,7 @@ class NoopAIProvider:
             },
         ]
 
-        if risk_level in ("high", "extreme"):
+        if risk_level in ("high", "critical"):
             base_cards.append({
                 "id": "card-003",
                 "title": "Evacuate to nearest shelter",
@@ -53,12 +53,12 @@ class NoopAIProvider:
         return base_cards
 
     async def generate_voice_script(self, context: dict[str, Any]) -> str:
-        risk_level = context.get("risk_level", "medium")
+        risk_level = context.get("risk_level", "attention")
         area_name = context.get("area_name", "your area")
         language = context.get("language", "zh-CN")
 
         if language.startswith("zh"):
-            if risk_level in ("high", "extreme"):
+            if risk_level in ("high", "critical"):
                 return (
                     f"紧急通知：{area_name}当前洪水风险等级为{risk_level}。"
                     f"请立即撤离至最近的避难所。避免经过积水路段。"
@@ -69,7 +69,7 @@ class NoopAIProvider:
                 f"请关注水位变化，做好防洪准备。"
             )
 
-        if risk_level in ("high", "extreme"):
+        if risk_level in ("high", "critical"):
             return (
                 f"URGENT NOTICE: Flood risk in {area_name} is {risk_level}. "
                 f"Evacuate to the nearest shelter immediately. Avoid flooded roads. "

@@ -44,7 +44,7 @@ async def create_report(body: CreateReportRequest, request: Request):
             "description": body.description,
             "photoUrl": body.photo_url,
             "location": location_geojson,
-            "status": "pending",
+            "status": "pending_review",
             "createdAt": now.isoformat(),
         },
     }
@@ -72,7 +72,7 @@ async def get_report(report_id: str, request: Request):
             "description": "Water level rising rapidly near the bridge.",
             "photoUrl": None,
             "location": {"type": "Point", "coordinates": [121.47, 31.23]},
-            "status": "pending",
+            "status": "pending_review",
             "createdAt": (now - timedelta(minutes=30)).isoformat(),
         },
     }
