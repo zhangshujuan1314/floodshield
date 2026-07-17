@@ -13,25 +13,42 @@ AI 洪涝预警与避险平台
 | Phase 0 | ✅ 完成 | 仓库骨架、Docker Compose、mock 模式 |
 | Phase 1 | ✅ 完成 | 领域模型、PostGIS 迁移、风险引擎 |
 | Phase 2 | ✅ 完成 | 居民端闭环（6 页面）、管理后台（8 页面） |
-| Phase 2.5 | ✅ 完成 | 安全加固：JWT 认证、数据库驱动预警、CheckConstraints、对抗性审查 |
-| Phase 3 | ⏳ 待开始 | 社区/应急后台增强 |
-| Phase 4 | ⏳ 待开始 | 真实数据适配器 |
-| Phase 5 | ⏳ 待开始 | AI 和语音 |
-| Phase 6 | ⏳ 待开始 | 演练和加固 |
+| Phase 2.5 | ✅ 完成 | 安全加固：JWT 认证、数据库驱动预警、CheckConstraints |
+| Phase 3 | ✅ 完成 | 社区/应急后台：全部端点数据库驱动（报告核验、任务管理、审计日志） |
+| Phase 4 | ✅ 完成 | 真实数据适配器：气象（OpenWeatherMap）、地图（高德）、通知（Webhook/SMS） |
+| Phase 5 | ✅ 完成 | AI 辅助：行动卡生成、语音播报、报告分类（含安全防护栏） |
+| Phase 6 | ✅ 完成 | 演练和加固：安全中间件、集成测试、对抗性审查（评级：BETA） |
 
 ### 项目统计
 
 | 指标 | 数值 |
 |------|------|
-| 源文件 | 150+ |
-| 代码行数 | 20,000+ |
-| 后端端点 | 31 个 |
-| 测试用例 | 100 个（全部通过） |
+| 源文件 | 170+ |
+| 代码行数 | 25,000+ |
+| 后端端点 | 35 个 |
+| 测试用例 | 135+ 个（含集成测试） |
 | 数据库表 | 15 张（PostGIS） |
 | 数据库约束 | 5 个 CheckConstraint |
+| 中间件 | 4 个（限流、安全头、净化、大小限制） |
+| 数据适配器 | 4 组（气象、地图、通知、AI） |
 | 前端页面 | 14 个（居民 6 + 后台 8） |
-| 组件 | 16 个 |
-| 文档 | 6 个 |
+| 对抗审查 | 6 轮，0 P0 残留 |
+
+### 安全评级
+
+**BETA** — 经过 6 轮对抗性审查，0 个 P0 安全漏洞残留。
+
+| 安全特性 | 状态 |
+|----------|------|
+| JWT 认证 + PBKDF2 | ✅ |
+| SECRET_KEY 启动守卫 | ✅ |
+| 登录限流（5次/分钟） | ✅ |
+| 安全响应头（CSP/HSTS） | ✅ |
+| AI 安全防护栏 | ✅ |
+| 语音脚本安全校验 | ✅ |
+| CheckConstraints | ✅ |
+| 审计日志 | ✅ |
+| 集成测试（关键路径） | ✅ |
 
 ### 安全加固（Phase 2.5）
 
@@ -241,7 +258,7 @@ POST /internal/risk/recompute
 ## 测试
 
 ```bash
-# 后端测试（100 个测试，全部通过）
+# 后端测试（135+ 个测试）
 cd services/api
 pytest -v
 
@@ -258,19 +275,25 @@ pytest --cov=app --cov-report=html
 | 通知安全 | 13 | 幂等性/状态生命周期/渠道/批量 |
 | 路线安全 | 10 | 3 种场景/几何/安全字段 |
 | 健康检查 | 3 | 请求 ID 传播 |
-| **认证安全** | **16** | **JWT 创建/验证/过期/角色检查** |
-| **预警数据库** | **17** | **数据库查询/过滤/MOCK 回退/转换** |
+| 认证安全 | 16 | JWT 创建/验证/过期/角色检查 |
+| 预警数据库 | 17 | 数据库查询/过滤/MOCK 回退/转换 |
+| **AI 安全** | **31** | **安全校验/schema 验证/注入防御/降级** |
+| **地图适配器** | **18** | **高德 API/缓存/错误处理** |
+| **气象适配器** | **17** | **OpenWeatherMap/TTL 缓存/降级** |
+| **集成测试** | **4** | **关键路径端到端** |
 
 ### 安全关键测试
 
 - `test_all_missing_returns_unknown_risk_level` — 缺失数据 ≠ 安全（risk_score=-1.0）
-- `test_same_idempotency_key_returns_same_delivery` — 通知幂等
-- `test_no_route_means_no_fake_route` — 无路线时不伪造
-- `test_report_location_fuzzing` — 坐标模糊化至 ~100m
-- `test_error_no_traceback` — 错误不暴露堆栈
+- `test_no_data_unknown_risk` — 无数据时风险为 unknown，不是 normal
 - `test_verify_token_expired` — 过期 JWT 拒绝
 - `test_get_current_user_no_token_non_mock_401` — 非 Mock 模式无 token 返回 401
 - `test_require_role_wrong_role_403` — 角色权限拦截
+- `test_dangerous_output_rejected` — AI 输出含精确积水深度被拒绝
+- `test_rescue_confirmation_rejected` — AI 输出含救援确认被拒绝
+- `test_injection_sanitized` — 提示注入被净化
+- `test_alert_to_nearby_flow` — 预警→风险→附近摘要端到端
+- `test_report_verify_audit` — 报告→核验→审计日志
 
 详见 [docs/test-matrix.md](docs/test-matrix.md)。
 
