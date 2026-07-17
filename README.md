@@ -26,17 +26,17 @@ AI 洪涝预警与避险平台
 | 源文件 | 170+ |
 | 代码行数 | 25,000+ |
 | 后端端点 | 35 个 |
-| 测试用例 | 135+ 个（含集成测试） |
+| 测试用例 | 147+ 个（含集成测试） |
 | 数据库表 | 15 张（PostGIS） |
 | 数据库约束 | 5 个 CheckConstraint |
 | 中间件 | 4 个（限流、安全头、净化、大小限制） |
 | 数据适配器 | 4 组（气象、地图、通知、AI） |
 | 前端页面 | 14 个（居民 6 + 后台 8） |
-| 对抗审查 | 6 轮，0 P0 残留 |
+| 对抗审查 | 7 轮，0 FAIL 残留 |
 
 ### 安全评级
 
-**BETA** — 经过 6 轮对抗性审查，0 个 P0 安全漏洞残留。
+**BETA** — 经过 7 轮对抗性审查，0 个 FAIL 项残留。全部端点数据库驱动，完整闭环验证通过。
 
 | 安全特性 | 状态 |
 |----------|------|
@@ -280,6 +280,7 @@ pytest --cov=app --cov-report=html
 | **AI 安全** | **31** | **安全校验/schema 验证/注入防御/降级** |
 | **地图适配器** | **18** | **高德 API/缓存/错误处理** |
 | **气象适配器** | **17** | **OpenWeatherMap/TTL 缓存/降级** |
+| **报告持久化** | **12** | **DB 写入/模糊化/匿名/审计** |
 | **集成测试** | **4** | **关键路径端到端** |
 
 ### 安全关键测试
@@ -294,6 +295,9 @@ pytest --cov=app --cov-report=html
 - `test_injection_sanitized` — 提示注入被净化
 - `test_alert_to_nearby_flow` — 预警→风险→附近摘要端到端
 - `test_report_verify_audit` — 报告→核验→审计日志
+- `test_post_creates_db_record` — 居民报告持久化到 DB
+- `test_post_stores_both_locations` — 精确位置 + 模糊位置分别存储
+- `test_post_anonymous_report` — 匿名报告（无用户）
 
 详见 [docs/test-matrix.md](docs/test-matrix.md)。
 
