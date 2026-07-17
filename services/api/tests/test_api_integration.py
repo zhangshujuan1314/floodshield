@@ -175,9 +175,8 @@ class TestVoice:
     async def test_voice_announcement(self, client: AsyncClient):
         resp = await client.post("/v1/voice/announcement", json={
             "areaId": "demo_001",
-            "urgency": "high",
-            "language": "zh-CN",
-            "message": "暴雨预警",
+            "riskLevel": "high",
+            "language": "zh",
         })
         assert resp.status_code == 200
         data = resp.json()["data"]
@@ -186,14 +185,15 @@ class TestVoice:
         assert data["needsHumanReview"] is True
         assert "generatedAt" in data
         assert "expiresAt" in data
+        assert "sourceIds" in data
+        assert "dataFreshness" in data
 
-    async def test_voice_requires_message(self, client: AsyncClient):
+    async def test_voice_requires_area_id(self, client: AsyncClient):
         resp = await client.post("/v1/voice/announcement", json={
-            "areaId": "demo_001",
-            "urgency": "high",
-            "language": "zh-CN",
+            "riskLevel": "high",
+            "language": "zh",
         })
-        assert resp.status_code == 422  # missing message
+        assert resp.status_code == 422  # missing areaId
 
 
 class TestMapLayers:
@@ -207,13 +207,15 @@ class TestMapLayers:
 class TestNotifications:
     async def test_create_subscription(self, client: AsyncClient):
         resp = await client.post("/v1/notifications/subscriptions", json={
+            "areaId": "demo_001",
             "channel": "push",
-            "recipient": "user_001",
-            "areas": ["demo_001"],
         })
         assert resp.status_code == 200
         data = resp.json()
         assert "data" in data
+        assert data["data"]["areaId"] == "demo_001"
+        assert data["data"]["channel"] == "push"
+        assert data["data"]["isActive"] is True
 
 
 class TestAdminEndpoints:

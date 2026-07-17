@@ -206,6 +206,9 @@ async def reject_report(
     if not report:
         raise NotFound(f"Report {report_id} not found", request_id=request_id)
 
+    if report.status != "pending_review":
+        raise BadRequest("Report is not pending review", request_id=request_id)
+
     report.status = "rejected"
 
     audit = AuditLog(

@@ -14,7 +14,11 @@ class Settings(BaseSettings):
     MOCK_MODE: bool = False
     AI_PROVIDER: str = "noop"
     MAP_PROVIDER: str = "mock"
+    MAP_API_KEY: str = ""
+    MAP_API_URL: str = "https://restapi.amap.com"
     WEATHER_PROVIDER: str = "mock"
+    WEATHER_API_KEY: str = ""
+    WEATHER_API_URL: str = "https://api.openweathermap.org/data/2.5"
     NOTIFICATION_PROVIDER: str = "mock"
     SECRET_KEY: str = "dev-secret-change-in-production"
     JWT_ALGORITHM: str = "HS256"
@@ -22,6 +26,16 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/v1"
     INTERNAL_PREFIX: str = "/internal"
     ALLOWED_ORIGINS: list[str] = ["*"]
+
+    # Real notification provider settings
+    SMS_API_KEY: str = ""
+    SMS_API_SECRET: str = ""
+    NOTIFICATION_API_URL: str = ""
+
+    # Real AI provider settings
+    AI_API_KEY: str = ""
+    AI_MODEL: str = "qwen-turbo"
+    AI_API_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":

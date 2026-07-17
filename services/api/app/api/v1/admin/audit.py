@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.deps import DbSession, require_role
+from app.core.errors import BadRequest
 from app.models.base import AuditLog
 
 router = APIRouter()
@@ -122,8 +123,12 @@ async def list_audit_logs(
         query = query.where(AuditLog.resource_type == resource_type)
         count_query = count_query.where(AuditLog.resource_type == resource_type)
     if actor_id:
-        query = query.where(AuditLog.actor_id == uuid.UUID(actor_id))
-        count_query = count_query.where(AuditLog.actor_id == uuid.UUID(actor_id))
+        try:
+            parsed_actor = uuid.UUID(actor_id)
+        except ValueError:
+            raise BadRequest("Invalid UUID for actorId", request_id=request_id)
+        query = query.where(AuditLog.actor_id == parsed_actor)
+        count_query = count_query.where(AuditLog.actor_id == parsed_actor)
 
     # Get total count
     total_result = await session.execute(count_query)

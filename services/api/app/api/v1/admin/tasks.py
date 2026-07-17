@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 
 from app.core.database import TZ_SHANGHAI
 from app.core.deps import DbSession, require_role
-from app.core.errors import NotFound
+from app.core.errors import BadRequest, NotFound
 from app.models.base import AuditLog, Task
 
 router = APIRouter()
@@ -60,7 +60,10 @@ async def create_task(
     request_id = getattr(request.state, "request_id", "")
     now = datetime.now(TZ_SHANGHAI)
 
-    assigned = uuid.UUID(body.assigned_to) if body.assigned_to else None
+    try:
+        assigned = uuid.UUID(body.assigned_to) if body.assigned_to else None
+    except ValueError:
+        raise BadRequest("Invalid UUID for assignedTo", request_id=request_id)
 
     task = Task(
         title=body.title,
@@ -118,6 +121,12 @@ async def update_task(
 
     changes: dict = {}
     if body.status is not None:
+        valid_statuses = {"pending", "in_progress", "completed", "cancelled"}
+        if body.status not in valid_statuses:
+            raise BadRequest(
+                f"Invalid status '{body.status}'. Must be one of: {', '.join(sorted(valid_statuses))}",
+                request_id=request_id,
+            )
         task.status = body.status
         changes["status"] = body.status
         if body.status == "completed":
@@ -127,7 +136,10 @@ async def update_task(
         task.priority = body.priority
         changes["priority"] = body.priority
     if body.assigned_to is not None:
-        task.assigned_to = uuid.UUID(body.assigned_to)
+        try:
+            task.assigned_to = uuid.UUID(body.assigned_to)
+        except ValueError:
+            raise BadRequest("Invalid UUID for assignedTo", request_id=request_id)
         changes["assignedTo"] = body.assigned_to
     if body.description is not None:
         task.description = body.description
