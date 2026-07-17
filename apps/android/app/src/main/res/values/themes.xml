@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.FloodShield" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/blue_primary</item>
+        <item name="colorPrimaryLight">@color/blue_primary_light</item>
+        <item name="colorSecondary">@color/orange_secondary</item>
+        <item name="android:statusBarColor">@color/blue_primary</item>
+    </style>
+</resources>

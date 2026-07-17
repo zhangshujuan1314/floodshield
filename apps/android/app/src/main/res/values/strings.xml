@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FloodShield</string>
+    <string name="app_subtitle">防洪预警系统</string>
+
+    <!-- 导航 -->
+    <string name="nav_home">首页</string>
+    <string name="nav_map">地图</string>
+    <string name="nav_shelters">避难所</string>
+    <string name="nav_profile">我的</string>
+
+    <!-- 首页 -->
+    <string name="home_title">防洪预警</string>
+    <string name="home_current_risk">当前风险等级</string>
+    <string name="home_alerts">最新预警</string>
+    <string name="home_no_alerts">暂无预警信息</string>
+
+    <!-- 地图 -->
+    <string name="map_title">风险地图</string>
+    <string name="map_loading">地图加载中...</string>
+
+    <!-- 避难所 -->
+    <string name="shelters_title">附近避难所</string>
+    <string name="shelters_empty">暂无避难所信息</string>
+
+    <!-- 上报 -->
+    <string name="report_title">上报险情</string>
+    <string name="report_type">险情类型</string>
+    <string name="report_description">描述</string>
+    <string name="report_submit">提交</string>
+    <string name="report_success">上报成功</string>
+    <string name="report_failed">上报失败，请重试</string>
+
+    <!-- 个人中心 -->
+    <string name="profile_title">个人中心</string>
+    <string name="profile_login">登录</string>
+    <string name="profile_register">注册</string>
+    <string name="profile_logout">退出登录</string>
+
+    <!-- 风险等级 -->
+    <string name="risk_high">高风险</string>
+    <string name="risk_medium">中风险</string>
+    <string name="risk_low">低风险</string>
+    <string name="risk_none">无风险</string>
+
+    <!-- 通用 -->
+    <string name="loading">加载中...</string>
+    <string name="error_network">网络连接失败</string>
+    <string name="retry">重试</string>
+    <string name="confirm">确认</string>
+    <string name="cancel">取消</string>
+</resources>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主色调 -->
+    <color name="blue_primary">#1565C0</color>
+    <color name="blue_primary_light">#90CAF9</color>
+    <color name="blue_primary_dark">#0D47A1</color>
+
+    <!-- 辅助色 -->
+    <color name="orange_secondary">#E65100</color>
+    <color name="orange_secondary_light">#FFCC80</color>
+
+    <!-- 风险等级 -->
+    <color name="risk_high">#D32F2F</color>
+    <color name="risk_medium">#FF8F00</color>
+    <color name="risk_low">#388E3C</color>
+    <color name="risk_none">#757575</color>
+
+    <!-- 背景色 -->
+    <color name="background_light">#F5F5F5</color>
+    <color name="background_dark">#121212</color>
+    <color name="surface_light">#FFFFFF</color>
+    <color name="surface_dark">#1E1E1E</color>
+</resources>
