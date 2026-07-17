@@ -7,11 +7,34 @@
 
 ## 关键安全规则
 - 官方预警、平台风险等级和 AI 摘要必须分开
-- 缺失/过期数据不能默认为安全
+- 缺失/过期数据不能默认为安全（risk_score=-1.0 表示无数据）
 - 路线必须返回证据、更新时间和失效时间
-- 用户报告先待核验，核验后才能升级可信度
+- 用户报告先待核验（`pending_review`），核验后才能升级可信度
 - 不保存后台持续定位，不把精确位置放入公开 API 或日志
-- mock provider 默认开启，真实外发必须显式配置和人工确认
+- MOCK_MODE 默认关闭，认证强制开启
+- 真实外发必须显式配置和人工确认
+- SECRET_KEY 必须在生产环境设置，默认值会阻止启动
+
+## 认证系统
+- JWT 认证：PyJWT + PBKDF2-SHA256（260k 迭代）
+- JWT 过期：60 分钟
+- MOCK_MODE=true 时：无 token 请求返回 mock admin
+- MOCK_MODE=false 时：无 token 请求返回 401
+- 密码验证始终执行（不被 MOCK_MODE 跳过）
+- is_active=False 的用户无法登录
+
+## 风险等级（对齐 SPEC）
+- `normal` — 当前证据无异常
+- `attention` — 存在降雨/预警/风险信号
+- `high` — 多类证据指向受影响
+- `critical` — 官方指令或多类强证据叠加
+- `unknown` — 全部数据缺失（risk_score=-1.0）
+
+## 数据库约束
+- User.role: CHECK (role IN ('admin','operator','community','emergency','viewer'))
+- RiskSnapshot.risk_level: CHECK (risk_level IN ('normal','attention','high','critical','unknown'))
+- RiskSnapshot.risk_score: CHECK (risk_score >= -1.0 AND risk_score <= 1.0)
+- Shelter.current_occupancy: CHECK (>= 0 AND <= capacity)
 
 ## 项目结构
 - apps/miniapp/ — Taro + React + TypeScript 居民端
@@ -22,9 +45,10 @@
 ## 开发命令
 - docker compose up -d — 启动所有服务
 - cd services/api && uvicorn app.main:app --reload — 启动 API
-- cd services/api && pytest — 运行测试
+- cd services/api && pytest — 运行测试（100 个）
 - cd apps/admin && npm run dev — 启动后台
 - cd apps/miniapp && npm run dev:weapp — 启动小程序
+- cd services/api && alembic upgrade head — 运行迁移
 
 ## 开发习惯
 - 先读代码和测试，再做最小改动
@@ -41,3 +65,4 @@
 - 自动确认救援已派出
 - 默认后台持续定位
 - 在没有凭证时发送真实短信/推送
+- 使用默认 SECRET_KEY 启动生产环境
