@@ -1,14 +1,16 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 
-from app.core.deps import require_role
+from app.core.database import TZ_SHANGHAI
+from app.core.deps import DbSession, require_role
 from app.core.errors import NotFound
+from app.models.base import AuditLog, Task
 
 router = APIRouter()
-TZ_SHANGHAI = timezone(timedelta(hours=8))
 
 
 class CreateTaskRequest(BaseModel):
@@ -26,36 +28,70 @@ class UpdateTaskRequest(BaseModel):
     status: str | None = None
     priority: str | None = None
     assigned_to: str | None = Field(default=None, alias="assignedTo")
-    due_at: datetime | None = Field(default=None, alias="dueAt")
+    description: str | None = None
 
     model_config = {"populate_by_name": True}
+
+
+def _task_to_dict(task: Task) -> dict:
+    """Convert a Task ORM instance to an API response dict."""
+    return {
+        "id": str(task.id),
+        "title": task.title,
+        "description": task.description,
+        "taskType": task.task_type,
+        "status": task.status,
+        "priority": task.priority,
+        "assignedTo": str(task.assigned_to) if task.assigned_to else None,
+        "dueAt": task.due_at.isoformat() if task.due_at else None,
+        "completedAt": task.completed_at.isoformat() if task.completed_at else None,
+        "createdAt": task.created_at.isoformat(),
+        "updatedAt": task.updated_at.isoformat(),
+    }
 
 
 @router.post("/tasks")
 async def create_task(
     body: CreateTaskRequest,
     request: Request,
+    db: DbSession,
     user: dict = require_role("admin", "operator"),
 ):
     request_id = getattr(request.state, "request_id", "")
     now = datetime.now(TZ_SHANGHAI)
-    task_id = uuid.uuid4()
+
+    assigned = uuid.UUID(body.assigned_to) if body.assigned_to else None
+
+    task = Task(
+        title=body.title,
+        description=body.description,
+        task_type=body.task_type,
+        priority=body.priority,
+        assigned_to=assigned,
+        due_at=body.due_at,
+    )
+    db.add(task)
+
+    audit = AuditLog(
+        actor_id=uuid.UUID(user["id"]),
+        action="create_task",
+        resource_type="task",
+        resource_id=task.id,
+        details={
+            "title": body.title,
+            "taskType": body.task_type,
+            "priority": body.priority,
+        },
+    )
+    db.add(audit)
+    await db.commit()
+    await db.refresh(task)
 
     return {
         "requestId": request_id,
         "dataStatus": "normal",
         "timestamp": now.isoformat(),
-        "data": {
-            "id": str(task_id),
-            "title": body.title,
-            "description": body.description,
-            "taskType": body.task_type,
-            "status": "pending",
-            "priority": body.priority,
-            "assignedTo": body.assigned_to,
-            "dueAt": body.due_at.isoformat() if body.due_at else None,
-            "createdAt": now.isoformat(),
-        },
+        "data": _task_to_dict(task),
     }
 
 
@@ -64,34 +100,93 @@ async def update_task(
     task_id: str,
     body: UpdateTaskRequest,
     request: Request,
+    db: DbSession,
     user: dict = require_role("admin", "operator"),
 ):
     request_id = getattr(request.state, "request_id", "")
     now = datetime.now(TZ_SHANGHAI)
 
     try:
-        uuid.UUID(task_id)
+        tid = uuid.UUID(task_id)
     except ValueError:
         raise NotFound(f"Task {task_id} not found", request_id=request_id)
 
-    completed_at = None
-    if body.status == "completed":
-        completed_at = now.isoformat()
+    result = await db.execute(select(Task).where(Task.id == tid))
+    task = result.scalar_one_or_none()
+    if not task:
+        raise NotFound(f"Task {task_id} not found", request_id=request_id)
+
+    changes: dict = {}
+    if body.status is not None:
+        task.status = body.status
+        changes["status"] = body.status
+        if body.status == "completed":
+            task.completed_at = now
+            changes["completedAt"] = now.isoformat()
+    if body.priority is not None:
+        task.priority = body.priority
+        changes["priority"] = body.priority
+    if body.assigned_to is not None:
+        task.assigned_to = uuid.UUID(body.assigned_to)
+        changes["assignedTo"] = body.assigned_to
+    if body.description is not None:
+        task.description = body.description
+        changes["description"] = body.description
+
+    audit = AuditLog(
+        actor_id=uuid.UUID(user["id"]),
+        action="update_task",
+        resource_type="task",
+        resource_id=tid,
+        details=changes,
+    )
+    db.add(audit)
+    await db.commit()
+    await db.refresh(task)
 
     return {
         "requestId": request_id,
         "dataStatus": "normal",
         "timestamp": now.isoformat(),
+        "data": _task_to_dict(task),
+    }
+
+
+@router.get("/tasks")
+async def list_tasks(
+    request: Request,
+    db: DbSession,
+    status: str | None = Query(default=None, max_length=32),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user: dict = require_role("admin", "operator"),
+):
+    request_id = getattr(request.state, "request_id", "")
+    now = datetime.now(TZ_SHANGHAI)
+
+    stmt = select(Task)
+    count_stmt = select(func.count()).select_from(Task)
+
+    if status:
+        stmt = stmt.where(Task.status == status)
+        count_stmt = count_stmt.where(Task.status == status)
+
+    stmt = stmt.order_by(Task.created_at.desc()).limit(limit).offset(offset)
+
+    result = await db.execute(stmt)
+    tasks = result.scalars().all()
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    items = [_task_to_dict(t) for t in tasks]
+    return {
+        "requestId": request_id,
+        "dataStatus": "normal",
+        "timestamp": now.isoformat(),
         "data": {
-            "id": task_id,
-            "title": "Deploy sandbags to riverbank",
-            "description": "Coordinate with logistics to deploy 500 sandbags.",
-            "taskType": "response",
-            "status": body.status or "in_progress",
-            "priority": body.priority or "high",
-            "assignedTo": body.assigned_to or user["id"],
-            "dueAt": body.due_at.isoformat() if body.due_at else None,
-            "completedAt": completed_at,
-            "updatedAt": now.isoformat(),
+            "items": items,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "hasNext": offset + limit < total,
         },
     }
