@@ -170,7 +170,7 @@ async def create_voice_announcement(
     body: VoiceAnnouncementRequest,
     request: Request,
     db: DbSession,
-    user: dict[str, Any] | None = None,
+    user: dict | None = None,
 ):
     """Generate a voice announcement script for a given area.
 

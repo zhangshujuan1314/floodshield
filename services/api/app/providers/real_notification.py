@@ -20,8 +20,10 @@ logger = logging.getLogger(__name__)
 
 TZ_SHANGHAI = timezone(timedelta(hours=8))
 
-# In-memory delivery store (upgrade to DB later)
+# In-memory delivery store
+# TODO: upgrade to DB-backed storage for production
 _deliveries: dict[str, dict[str, Any]] = {}
+_MAX_DELIVERIES = 10000
 
 # Retry configuration
 MAX_RETRIES = 3
@@ -64,6 +66,16 @@ class RealNotificationProvider:
             "retry_count": 0,
             "metadata": metadata or {},
         }
+
+        # Evict stale entries if over limit
+        if len(_deliveries) > _MAX_DELIVERIES:
+            cutoff = datetime.now(TZ_SHANGHAI) - timedelta(hours=1)
+            stale = [
+                did for did, d in _deliveries.items()
+                if d.get("created_at", "") < cutoff.isoformat()
+            ]
+            for did in stale:
+                del _deliveries[did]
 
         _deliveries[delivery_id] = delivery
 
@@ -142,19 +154,23 @@ class RealNotificationProvider:
             )
             return
 
+        if not settings.NOTIFICATION_API_URL.startswith("https://"):
+            logger.warning("NOTIFICATION_API_URL is not HTTPS; credentials may be exposed: %s",
+                           settings.NOTIFICATION_API_URL)
+
         payload: dict[str, Any] = {
             "channel": channel,
             "recipient": recipient,
             "message": message,
         }
 
-        # Add channel-specific fields for Alibaba Cloud SMS compatibility
+        headers: dict[str, str] = {}
         if channel == "sms" and settings.SMS_API_KEY:
-            payload["access_key"] = settings.SMS_API_KEY
-            payload["access_secret"] = settings.SMS_API_SECRET
+            headers["X-API-Key"] = settings.SMS_API_KEY
+            headers["X-API-Secret"] = settings.SMS_API_SECRET
 
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(settings.NOTIFICATION_API_URL, json=payload)
+            resp = await client.post(settings.NOTIFICATION_API_URL, json=payload, headers=headers)
             resp.raise_for_status()
 
     def clear(self) -> None:

@@ -244,6 +244,12 @@ class RealAIProvider:
             logger.warning("AI voice script empty or too long; falling back to noop")
             return await _FALLBACK.generate_voice_script(context)
 
+        # Safety check: reuse _check_safety with a minimal dict wrapper
+        safety_issues = _check_safety({"summary": script})
+        if safety_issues:
+            logger.warning("Voice script safety violation: %s; falling back to noop", safety_issues)
+            return await _FALLBACK.generate_voice_script(context)
+
         return script
 
     async def classify_report(

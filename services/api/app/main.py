@@ -11,7 +11,11 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.core.database import engine
 from app.core.errors import AppError, app_error_handler, generic_error_handler
+from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_id import RequestIDMiddleware
+from app.middleware.request_size_limit import RequestSizeLimitMiddleware
+from app.middleware.sanitize import SanitizeMiddleware
+from app.middleware.security_headers import SecurityHeadersMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +49,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Request ID middleware
+# Security middleware (order matters: outermost runs first)
+app.add_middleware(SecurityHeadersMiddleware, production=not settings.MOCK_MODE)
+app.add_middleware(RequestSizeLimitMiddleware)
+app.add_middleware(SanitizeMiddleware)
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestIDMiddleware)
 
 # Error handlers — never expose stack traces
