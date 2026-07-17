@@ -85,6 +85,14 @@ async def get_current_user(request: Request) -> dict[str, Any]:
     raise Unauthorized("Missing Authorization header.")
 
 
+async def get_optional_user(request: Request) -> dict[str, Any] | None:
+    """Return the current user if authenticated, None if anonymous."""
+    try:
+        return await get_current_user(request)
+    except (Unauthorized, Exception):
+        return None
+
+
 def require_role(*roles: str):
     """Decorator/factory that checks the user has one of the required roles."""
 
